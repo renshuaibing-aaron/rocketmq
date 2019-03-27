@@ -19,12 +19,14 @@ package org.apache.rocketmq.namesrv;
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.joran.JoranConfigurator;
 import ch.qos.logback.core.joran.spi.JoranException;
+
 import java.io.BufferedInputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 import java.util.concurrent.Callable;
+
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
@@ -41,26 +43,41 @@ import org.apache.rocketmq.srvutil.ServerUtil;
 import org.apache.rocketmq.srvutil.ShutdownHookThread;
 import org.slf4j.LoggerFactory;
 
-public class NamesrvStartup {
+/**
+ * 启动入口
+ */
+public class NamesrvStartup
+{
 
     private static InternalLogger log;
     private static Properties properties = null;
     private static CommandLine commandLine = null;
 
-    public static void main(String[] args) {
+    public static void main(String[] args)
+    {
         main0(args);
     }
 
-    public static NamesrvController main0(String[] args) {
+    /**
+     * 1.解析命令行参数 -c -p参数
+     * 2.初始化 Controller
+     * @param args
+     * @return
+     */
+    public static NamesrvController main0(String[] args)
+    {
 
-        try {
+        try
+        {
             NamesrvController controller = createNamesrvController(args);
             start(controller);
-            String tip = "The Name Server boot success. serializeType=" + RemotingCommand.getSerializeTypeConfigInThisServer();
+            String tip = "The Name Server boot success. serializeType=" + RemotingCommand
+                    .getSerializeTypeConfigInThisServer();
             log.info(tip);
             System.out.printf("%s%n", tip);
             return controller;
-        } catch (Throwable e) {
+        } catch (Throwable e)
+        {
             e.printStackTrace();
             System.exit(-1);
         }
@@ -68,13 +85,24 @@ public class NamesrvStartup {
         return null;
     }
 
-    public static NamesrvController createNamesrvController(String[] args) throws IOException, JoranException {
+    /**
+     * -c 命令行参数用来指定配置文件的位置; －p 命令行参数用来打印所有配置
+     * 项的值。注意,用 －p 参数打印配置项的值之后程序就退出了,这是一个帮助调
+     * 试的选项。
+     * @param args
+     * @return
+     * @throws IOException
+     * @throws JoranException
+     */
+    public static NamesrvController createNamesrvController(String[] args) throws IOException, JoranException
+    {
         System.setProperty(RemotingCommand.REMOTING_VERSION_KEY, Integer.toString(MQVersion.CURRENT_VERSION));
         //PackageConflictDetect.detectFastjson();
 
         Options options = ServerUtil.buildCommandlineOptions(new Options());
         commandLine = ServerUtil.parseCmdLine("mqnamesrv", args, buildCommandlineOptions(options), new PosixParser());
-        if (null == commandLine) {
+        if (null == commandLine)
+        {
             System.exit(-1);
             return null;
         }
@@ -82,9 +110,11 @@ public class NamesrvStartup {
         final NamesrvConfig namesrvConfig = new NamesrvConfig();
         final NettyServerConfig nettyServerConfig = new NettyServerConfig();
         nettyServerConfig.setListenPort(9876);
-        if (commandLine.hasOption('c')) {
+        if (commandLine.hasOption('c'))
+        {
             String file = commandLine.getOptionValue('c');
-            if (file != null) {
+            if (file != null)
+            {
                 InputStream in = new BufferedInputStream(new FileInputStream(file));
                 properties = new Properties();
                 properties.load(in);
@@ -98,7 +128,8 @@ public class NamesrvStartup {
             }
         }
 
-        if (commandLine.hasOption('p')) {
+        if (commandLine.hasOption('p'))
+        {
             InternalLogger console = InternalLoggerFactory.getLogger(LoggerName.NAMESRV_CONSOLE_NAME);
             MixAll.printObjectProperties(console, namesrvConfig);
             MixAll.printObjectProperties(console, nettyServerConfig);
@@ -107,8 +138,10 @@ public class NamesrvStartup {
 
         MixAll.properties2Object(ServerUtil.commandLine2Properties(commandLine), namesrvConfig);
 
-        if (null == namesrvConfig.getRocketmqHome()) {
-            System.out.printf("Please set the %s variable in your environment to match the location of the RocketMQ installation%n", MixAll.ROCKETMQ_HOME_ENV);
+        if (null == namesrvConfig.getRocketmqHome())
+        {
+            System.out.printf("Please set the %s variable in your environment to match the location of the RocketMQ " +
+                    "installation%n", MixAll.ROCKETMQ_HOME_ENV);
             System.exit(-2);
         }
 
@@ -131,21 +164,27 @@ public class NamesrvStartup {
         return controller;
     }
 
-    public static NamesrvController start(final NamesrvController controller) throws Exception {
+    public static NamesrvController start(final NamesrvController controller) throws Exception
+    {
 
-        if (null == controller) {
+        if (null == controller)
+        {
             throw new IllegalArgumentException("NamesrvController is null");
         }
 
         boolean initResult = controller.initialize();
-        if (!initResult) {
+        if (!initResult)
+        {
             controller.shutdown();
             System.exit(-3);
         }
-
-        Runtime.getRuntime().addShutdownHook(new ShutdownHookThread(log, new Callable<Void>() {
+//当程序退出的时候会调用
+//controller.shutdown 来做退出前的清理工作
+        Runtime.getRuntime().addShutdownHook(new ShutdownHookThread(log, new Callable <Void>()
+        {
             @Override
-            public Void call() throws Exception {
+            public Void call() throws Exception
+            {
                 controller.shutdown();
                 return null;
             }
@@ -156,11 +195,13 @@ public class NamesrvStartup {
         return controller;
     }
 
-    public static void shutdown(final NamesrvController controller) {
+    public static void shutdown(final NamesrvController controller)
+    {
         controller.shutdown();
     }
 
-    public static Options buildCommandlineOptions(final Options options) {
+    public static Options buildCommandlineOptions(final Options options)
+    {
         Option opt = new Option("c", "configFile", true, "Name server config properties file");
         opt.setRequired(false);
         options.addOption(opt);
@@ -172,7 +213,8 @@ public class NamesrvStartup {
         return options;
     }
 
-    public static Properties getProperties() {
+    public static Properties getProperties()
+    {
         return properties;
     }
 }
