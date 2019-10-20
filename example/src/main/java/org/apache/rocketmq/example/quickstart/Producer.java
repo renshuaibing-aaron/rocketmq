@@ -44,13 +44,14 @@ public class Producer {
          * }
          * </pre>
          */
-
+        producer.setNamesrvAddr("127.0.0.1:9876");
         /*
          * Launch the instance.
          */
         producer.start();
 
-        for (int i = 0; i < 1000; i++) {
+        //发送10条信息
+        for (int i = 0; i < 10; i++) {
             try {
 
                 /*
@@ -58,7 +59,7 @@ public class Producer {
                  */
                 Message msg = new Message("TopicTest" /* Topic */,
                     "TagA" /* Tag */,
-                    ("Hello RocketMQ " + i).getBytes(RemotingHelper.DEFAULT_CHARSET) /* Message body */
+                    ("你好 RocketMQ,这是一条测试消息 " + i).getBytes(RemotingHelper.DEFAULT_CHARSET) /* Message body */
                 );
 
                 /*

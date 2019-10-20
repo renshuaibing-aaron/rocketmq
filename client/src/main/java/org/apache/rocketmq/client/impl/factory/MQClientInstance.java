@@ -122,15 +122,27 @@ public class MQClientInstance {
         this(clientConfig, instanceIndex, clientId, null);
     }
 
+    /**
+     * 初始化MQClientInstance对象
+     * @param clientConfig
+     * @param instanceIndex
+     * @param clientId
+     * @param rpcHook
+     */
     public MQClientInstance(ClientConfig clientConfig, int instanceIndex, String clientId, RPCHook rpcHook) {
         this.clientConfig = clientConfig;
         this.instanceIndex = instanceIndex;
         this.nettyClientConfig = new NettyClientConfig();
         this.nettyClientConfig.setClientCallbackExecutorThreads(clientConfig.getClientCallbackExecutorThreads());
         this.nettyClientConfig.setUseTLS(clientConfig.isUseTLS());
+
+        //初始化ClientRemotingProcessor对象，处理接受的事件请求
         this.clientRemotingProcessor = new ClientRemotingProcessor(this);
+
+        //初始化MQClientAPIImpl对象....
         this.mQClientAPIImpl = new MQClientAPIImpl(this.nettyClientConfig, this.clientRemotingProcessor, rpcHook, clientConfig);
 
+        //若ClientConfig.namesrvAddr不为空，则拆分成数组存入MQClientAPIImpl.remotingClient变量中
         if (this.clientConfig.getNamesrvAddr() != null) {
             this.mQClientAPIImpl.updateNameServerAddressList(this.clientConfig.getNamesrvAddr());
             log.info("user specified name server address: {}", this.clientConfig.getNamesrvAddr());
@@ -140,13 +152,19 @@ public class MQClientInstance {
 
         this.mQAdminImpl = new MQAdminImpl(this);
 
+
+        //初始化PullMessageService服务线程 供DefaultMQPushConsumer端使用的
         this.pullMessageService = new PullMessageService(this);
 
+        //初始化RebalanceService服务线程  供Consumser端使用的
         this.rebalanceService = new RebalanceService(this);
 
+        //初始化producerGroup等于"CLIENT_INNER_PRODUCER"的DefaultMQProducer对象
         this.defaultMQProducer = new DefaultMQProducer(MixAll.CLIENT_INNER_PRODUCER_GROUP);
         this.defaultMQProducer.resetClientConfig(clientConfig);
 
+
+        //初始化ConsumerStatsManager服务线程
         this.consumerStatsManager = new ConsumerStatsManager(this.scheduledExecutorService);
 
         log.info("Created a new client Instance, InstanceIndex:{}, ClientID:{}, ClientConfig:{}, ClientVersion:{}, SerializerType:{}",
@@ -591,7 +609,10 @@ public class MQClientInstance {
             if (this.lockNamesrv.tryLock(LOCK_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
                 try {
                     TopicRouteData topicRouteData;
+                    //如果是默认topic则获取默认topic的信息 否则获取topic的信息
                     if (isDefault && defaultMQProducer != null) {
+
+                        //获取topic的消息
                         topicRouteData = this.mQClientAPIImpl.getDefaultTopicRouteInfoFromNameServer(defaultMQProducer.getCreateTopicKey(),
                             1000 * 3);
                         if (topicRouteData != null) {
@@ -602,6 +623,7 @@ public class MQClientInstance {
                             }
                         }
                     } else {
+                        //获取topic的消息
                         topicRouteData = this.mQClientAPIImpl.getTopicRouteInfoFromNameServer(topic, 1000 * 3);
                     }
                     if (topicRouteData != null) {

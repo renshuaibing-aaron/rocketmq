@@ -75,23 +75,35 @@ public class NamesrvController
         this.configuration.setStorePathFromConfig(this.namesrvConfig, "configStorePath");
     }
 
+    /**
+     * 初始化
+     * @return
+     */
     public boolean initialize()
     {
 
+        //1、KVConfigManager类加载NameServer的配置参数，配置参数的路径是 $HOME /namesrv/kvConfig.json;
+        // 将配置参数加载保存到KVConfigManager.configTable:HashMap<String/*namespace*/,HashMap<String/*key*/,String/*value*/>>变量中
         this.kvConfigManager.load();
 
+        //以初始化BrokerHousekeepingService对象为参数初始化NettyRemotingServer对象
         this.remotingServer = new NettyRemotingServer(this.nettyServerConfig, this.brokerHousekeepingService);
-        //执行线程池初始化  一个默认是 8 个线程的线程池 (private int serverWorkerThreads ＝8)，
+
+
+        //执行线程池初始化一个默认是8个线程的线程池 (private int serverWorkerThreads ＝8)，
         this.remotingExecutor = Executors.newFixedThreadPool(nettyServerConfig.getServerWorkerThreads(), new
                 ThreadFactoryImpl("RemotingExecutorThread_"));
+
 
        /* 启 动 负责 通 信 的服 务 remotingServer, remotingServer 监 昕 一些端
         口 ，收到 Broker 、 Client 等发过来的请求后，根据请求的命令，调用不同的
         Processor 来处理 。 这些不 同的处理逻辑被放到上面初始化的线程池中执行，*/
-
+       //注册默认的处理类DefaultRequestProcessor,所有的请求均由该处理类的processRequest方法来处理。
         this.registerProcessor();
 
+
         //还有两个定时执行的线程，一个用来扫描失效的 Broker (scanNotActiveBroker)
+        //定时任务 I: NameServer 每隔 I Os 扫描一次 Broker ， 移除处于不激活状态的 Broker
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable()
         {
 
@@ -105,6 +117,7 @@ public class NamesrvController
 
 
         //另一个用来打印配置信息（ printAllPeriodically ）
+        //定时任务 2: names巳rver 每隔 10 分钟打印一次 KV 配置 。
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable()
         {
 

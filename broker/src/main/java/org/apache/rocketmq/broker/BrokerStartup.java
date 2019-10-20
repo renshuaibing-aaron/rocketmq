@@ -61,6 +61,7 @@ public class BrokerStartup {
     public static BrokerController start(BrokerController controller) {
         try {
 
+            //2 Broker的启动过程
             controller.start();
 
             String tip = "The broker[" + controller.getBrokerConfig().getBrokerName() + ", "
@@ -215,6 +216,9 @@ public class BrokerStartup {
             // remember all configs to prevent discard
             controller.getConfiguration().registerConfig(properties);
 
+            /**
+             * Broker的初始化过程
+             */
             boolean initResult = controller.initialize();
             if (!initResult) {
                 controller.shutdown();

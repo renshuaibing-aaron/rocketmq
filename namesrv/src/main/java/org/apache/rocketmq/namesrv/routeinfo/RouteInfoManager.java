@@ -45,14 +45,31 @@ import org.apache.rocketmq.common.protocol.route.TopicRouteData;
 import org.apache.rocketmq.common.sysflag.TopicSysFlag;
 import org.apache.rocketmq.remoting.common.RemotingUtil;
 
+//NameServer 路由实现类
 public class RouteInfoManager {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.NAMESRV_LOGGER_NAME);
     private final static long BROKER_CHANNEL_EXPIRED_TIME = 1000 * 60 * 2;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
+    /**
+     * Topic 消息队列路由信息，消息发送时根据路由表进行负载均衡 。
+     */
     private final HashMap<String/* topic */, List<QueueData>> topicQueueTable;
+    /**
+     * Broker 基础信息， 包含 brokerName 、 所属集群名称 、 主备 Broker
+     * 地址
+     */
     private final HashMap<String/* brokerName */, BrokerData> brokerAddrTable;
+    /**
+     * Broker 集群信息，存储集群中所有 Broker 名称
+     */
     private final HashMap<String/* clusterName */, Set<String/* brokerName */>> clusterAddrTable;
+    /**
+     * Broker 状态信息 。 NameServer 每次收到心跳包时会替换该信息
+     */
     private final HashMap<String/* brokerAddr */, BrokerLiveInfo> brokerLiveTable;
+    /**
+     * Broker 上的 FilterServer 列表，用于类模式消息过滤
+     */
     private final HashMap<String/* brokerAddr */, List<String>/* Filter Server */> filterServerTable;
 
     public RouteInfoManager() {
@@ -99,6 +116,18 @@ public class RouteInfoManager {
         return topicList.encode();
     }
 
+    /**
+     * clusterAddrTable 维护
+     * @param clusterName
+     * @param brokerAddr
+     * @param brokerName
+     * @param brokerId
+     * @param haServerAddr
+     * @param topicConfigWrapper
+     * @param filterServerList
+     * @param channel
+     * @return
+     */
     public RegisterBrokerResult registerBroker(
         final String clusterName,
         final String brokerAddr,
@@ -111,6 +140,9 @@ public class RouteInfoManager {
         RegisterBrokerResult result = new RegisterBrokerResult();
         try {
             try {
+                //Step 1：路由注册需要加写锁,防止并发修改 RoutelnfoManager中的路由表 。
+                //首先判断Broker所属集群是否存在,如果不存在,则创建，然后将 broker 名加入到集群 Broker 集
+                //合中 。
                 this.lock.writeLock().lockInterruptibly();
 
                 Set<String> brokerNames = this.clusterAddrTable.get(clusterName);
@@ -122,6 +154,9 @@ public class RouteInfoManager {
 
                 boolean registerFirst = false;
 
+                //Step2 ：维护 BrokerData 信 息 ，首 先从 brokerAddrTable 根据 BrokerNam e 尝试获取
+                //Broker 信息 ，如 果 不 存在， 则 新建 BrokerData 并放入 到 brokerAddrTable , reg isterF irst 设
+                //置为 true ；如果存在 ， 直接替换原先的， registerFirst 设置为 false，表示非第一次注册 。
                 BrokerData brokerData = this.brokerAddrTable.get(brokerName);
                 if (null == brokerData) {
                     registerFirst = true;
@@ -131,6 +166,13 @@ public class RouteInfoManager {
                 String oldAddr = brokerData.getBrokerAddrs().put(brokerId, brokerAddr);
                 registerFirst = registerFirst || (null == oldAddr);
 
+
+
+                //Step3 ：如果 Brok er 为 Master ，并且 Broker Topic 配置信息发生变化或者是初 次注册 ，
+                //则需要创建或更新 Topic 路 由元数据，填充 topicQueueTable ， 其实就是为默认主题自动注
+                //册路 由 信息，其 中包含 MixAII.DEFAULT TOPIC 的路由信息 。 当消息生产者发送主题时 ，
+                //如 果该主题未创 建并且 BrokerConfi g 的 autoCreateTopicEnabl e 为 true 时， 将返回 MixAII.
+                //DEFAULT TOPIC 的路由信息 。
                 if (null != topicConfigWrapper
                     && MixAll.MASTER_ID == brokerId) {
                     if (this.isBrokerTopicConfigChanged(brokerAddr, topicConfigWrapper.getDataVersion())
@@ -139,6 +181,9 @@ public class RouteInfoManager {
                             topicConfigWrapper.getTopicConfigTable();
                         if (tcTable != null) {
                             for (Map.Entry<String, TopicConfig> entry : tcTable.entrySet()) {
+
+                                //Step4 ： 更新 BrokerLivelnfo ，存活 Broker 信息表， BrokeLivelnfo 是执行路由 删除的重
+                                //要依据
                                 this.createAndUpdateQueueData(brokerName, entry.getValue());
                             }
                         }
@@ -155,6 +200,10 @@ public class RouteInfoManager {
                     log.info("new broker registered, {} HAServer: {}", brokerAddr, haServerAddr);
                 }
 
+
+                //Step5 ： 注册 Broker 的过滤器 Server 地址列表 ，一个 Broker 上会关联多个 FilterServer
+                //消息过滤服务器，此部分内容将在第 6 章详细介绍；如果此 Broker 为从节点，则需要查找
+                //该 Broker 的 Master 的节点信息，并更新对应的 masterAddr 属性 。
                 if (filterServerList != null) {
                     if (filterServerList.isEmpty()) {
                         this.filterServerTable.remove(brokerAddr);

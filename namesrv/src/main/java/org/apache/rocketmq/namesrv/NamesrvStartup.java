@@ -69,6 +69,7 @@ public class NamesrvStartup
 
         try
         {
+            //Stepl ： 首先来解析配置文件,需要填充NettyServerConfig , NameServerConfig 属性值 。
             NamesrvController controller = createNamesrvController(args);
             start(controller);
             String tip = "The Name Server boot success. serializeType=" + RemotingCommand
@@ -106,9 +107,12 @@ public class NamesrvStartup
             System.exit(-1);
             return null;
         }
-
+       //初始化nameserver和nettyserverconfig的值
         final NamesrvConfig namesrvConfig = new NamesrvConfig();
         final NettyServerConfig nettyServerConfig = new NettyServerConfig();
+
+        //1 ) -c configFile 通过，c 命令指定配置文件的路径 。
+        //2 ） 使用“ 一 属 性名 属 性值”，例如一 listenPort 9876 。
         nettyServerConfig.setListenPort(9876);
         if (commandLine.hasOption('c'))
         {
@@ -156,8 +160,9 @@ public class NamesrvStartup
         MixAll.printObjectProperties(log, namesrvConfig);
         MixAll.printObjectProperties(log, nettyServerConfig);
 
+        //Step2 ：根据启动属性创建 NamesrvController 实例，并初始化该实例 ， NameServerController
+        //实例为 NameServer核心控制器。
         final NamesrvController controller = new NamesrvController(namesrvConfig, nettyServerConfig);
-
         // remember all configs to prevent discard
         controller.getConfiguration().registerConfig(properties);
 
@@ -172,14 +177,21 @@ public class NamesrvStartup
             throw new IllegalArgumentException("NamesrvController is null");
         }
 
+        //NameServer的初始化
         boolean initResult = controller.initialize();
         if (!initResult)
         {
             controller.shutdown();
             System.exit(-3);
         }
-//当程序退出的时候会调用
-//controller.shutdown 来做退出前的清理工作
+         //当程序退出的时候会调用
+        //controller.shutdown 来做退出前的清理工作
+        //Step3 ：注册 JVM 钩子函数并启动服务器， 以便监昕 Broker 、消息生产者 的网络请求 。
+        /**
+         * 如果代码中使用了线程池，一种优雅停
+         * 机的方式就是注册一个 JVM 钩子函数， 在 JVM 进程关闭之前，先将线程池关闭 ，及时释
+         * 放资源
+         */
         Runtime.getRuntime().addShutdownHook(new ShutdownHookThread(log, new Callable <Void>()
         {
             @Override
@@ -190,6 +202,8 @@ public class NamesrvStartup
             }
         }));
 
+        //启动NameServer的Netty服务端（NettyRemotingServer），监听渠道的请求信息。当收到客户端的请求信息之后会初始化一个线程，
+        // 并放入线程池中进行处理,该线程调用DefaultRequestProcessor. processRequest方法来处理请求
         controller.start();
 
         return controller;

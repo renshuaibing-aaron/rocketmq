@@ -275,6 +275,7 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
     public DefaultMQPushConsumer(final String consumerGroup, RPCHook rpcHook,
         AllocateMessageQueueStrategy allocateMessageQueueStrategy) {
         this.consumerGroup = consumerGroup;
+        //默认初始化MssageQueue分配策略AllocateMessageQueueAveragely赋值给DefaultMQPushConsumer. allocateMessageQueueStrategy变量
         this.allocateMessageQueueStrategy = allocateMessageQueueStrategy;
         defaultMQPushConsumerImpl = new DefaultMQPushConsumerImpl(this, rpcHook);
     }
@@ -529,6 +530,7 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
     }
 
     public void setSubscription(Map<String, String> subscription) {
+        //将应用层的topic-subExpression值存入DefaultMQPushConsumer.subscription:Map<String /* topic */, String /* sub expression */>变量中
         this.subscription = subscription;
     }
 
@@ -613,6 +615,9 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
      */
     @Override
     public void registerMessageListener(MessageListenerConcurrently messageListener) {
+        //在该方法中将参数messageListener赋值给DefaultMQPushConsumer.messageListener和DefaultMQPushConsumerImpl.messageListenerInner变量；
+        // 该MessageListener接口有两个实现类MessageListenerConcurrently和 MessageListenerOrderly，
+        // 具有的业务逻辑在这两个类的consumeMessage方法中实现
         this.messageListener = messageListener;
         this.defaultMQPushConsumerImpl.registerMessageListener(messageListener);
     }

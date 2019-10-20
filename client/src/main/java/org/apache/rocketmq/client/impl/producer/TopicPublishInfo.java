@@ -23,6 +23,9 @@ import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.common.protocol.route.QueueData;
 import org.apache.rocketmq.common.protocol.route.TopicRouteData;
 
+/**
+ * TopicPublishInfo中主要包含了包括：消息队列（MessageQueue）集合，一个index和最重要的topic路由信息（TopicRouteData）。
+ */
 public class TopicPublishInfo {
     private boolean orderTopic = false;
     private boolean haveTopicRouterInfo = false;

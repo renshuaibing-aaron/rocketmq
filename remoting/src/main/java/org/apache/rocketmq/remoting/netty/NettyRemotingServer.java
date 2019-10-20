@@ -62,6 +62,11 @@ import org.apache.rocketmq.remoting.exception.RemotingTimeoutException;
 import org.apache.rocketmq.remoting.exception.RemotingTooMuchRequestException;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 
+/**
+ * NettyRemotingClient/NettyRemotingServer：分别实现了RemotingClient和RemotingServer,
+ * 都继承了NettyRemotingAbstract抽象类。
+ * RocketMQ中其他的组件（如client、nameServer、broker在进行消息的发送和接收时均使用这两个组件
+ */
 public class NettyRemotingServer extends NettyRemotingAbstract implements RemotingServer {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(RemotingHelper.ROCKETMQ_REMOTING);
     private final ServerBootstrap serverBootstrap;
@@ -88,6 +93,7 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
 
     public NettyRemotingServer(final NettyServerConfig nettyServerConfig,
         final ChannelEventListener channelEventListener) {
+
         super(nettyServerConfig.getServerOnewaySemaphoreValue(), nettyServerConfig.getServerAsyncSemaphoreValue());
         this.serverBootstrap = new ServerBootstrap();
         this.nettyServerConfig = nettyServerConfig;
@@ -174,6 +180,8 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
 
     @Override
     public void start() {
+
+        //默认的处理线程池组,使用默认的处理线程池组用于处理后面的多个Netty Handler的逻辑操作
         this.defaultEventExecutorGroup = new DefaultEventExecutorGroup(
             nettyServerConfig.getServerWorkerThreads(),
             new ThreadFactory() {
@@ -186,6 +194,15 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
                 }
             });
 
+        /**
+         * 首先来看下 RocketMQ NettyServer 的 Reactor 线程模型，
+         * 一个 Reactor 主线程负责监听 TCP 连接请求;
+         * 建立好连接后丢给 Reactor 线程池，它负责将建立好连接的 socket 注册到 selector
+         * 上去（这里有两种方式，NIO和Epoll，可配置），然后监听真正的网络数据;
+         * 拿到网络数据后，再丢给 Worker 线程池;
+         *
+         */
+        //RocketMQ-> Java NIO的1+N+M模型：1个acceptor线程，N个IO线程，M1个worker 线程。
         ServerBootstrap childHandler =
             this.serverBootstrap.group(this.eventLoopGroupBoss, this.eventLoopGroupSelector)
                 .channel(useEpoll() ? EpollServerSocketChannel.class : NioServerSocketChannel.class)

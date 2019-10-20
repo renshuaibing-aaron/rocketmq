@@ -50,10 +50,19 @@ public class ClientManageProcessor implements NettyRequestProcessor {
         this.brokerController = brokerController;
     }
 
+    /**
+     *
+     * @param ctx
+     * @param request
+     * @return
+     * @throws RemotingCommandException
+     */
     @Override
     public RemotingCommand processRequest(ChannelHandlerContext ctx, RemotingCommand request)
         throws RemotingCommandException {
         switch (request.getCode()) {
+
+            //处理与客户端的心跳消息
             case RequestCode.HEART_BEAT:
                 return this.heartBeat(ctx, request);
             case RequestCode.UNREGISTER_CLIENT:
@@ -72,8 +81,13 @@ public class ClientManageProcessor implements NettyRequestProcessor {
     }
 
     public RemotingCommand heartBeat(ChannelHandlerContext ctx, RemotingCommand request) {
+
         RemotingCommand response = RemotingCommand.createResponseCommand(null);
+
+        //解码接受消息，生成HeartbeatData对象；
         HeartbeatData heartbeatData = HeartbeatData.decode(request.getBody(), HeartbeatData.class);
+
+        //根据链接的Channel、ClientID等信息初始化ClientChannelInfo对象；
         ClientChannelInfo clientChannelInfo = new ClientChannelInfo(
             ctx.channel(),
             heartbeatData.getClientID(),
@@ -81,6 +95,7 @@ public class ClientManageProcessor implements NettyRequestProcessor {
             request.getVersion()
         );
 
+        //若HeartbeatData对象中的ConsumerData集合有数据，则进行Consumer注册，对于该集合中的每个ConsumerData对象遍历如下操作步骤
         for (ConsumerData data : heartbeatData.getConsumerDataSet()) {
             SubscriptionGroupConfig subscriptionGroupConfig =
                 this.brokerController.getSubscriptionGroupManager().findSubscriptionGroupConfig(

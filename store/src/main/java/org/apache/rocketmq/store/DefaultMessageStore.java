@@ -217,14 +217,29 @@ public class DefaultMessageStore implements MessageStore {
         lockFile.getChannel().write(ByteBuffer.wrap("lock".getBytes()));
         lockFile.getChannel().force(true);
 
+        //启动FlushConsumeQueueService线程服务
         this.flushConsumeQueueService.start();
+
+        //调用CommitLog.start方法，启动CommitLog对象中的FlushCommitLogService线程服务，
+        // 若是同步刷盘（SYNC_FLUSH）则是启动GroupCommitService线程服务；若是异步刷盘（ASYNC_FLUSH）则是启动FlushRealTimeService线程服务
         this.commitLog.start();
+
+        //启动StoreStatsService线程服务
         this.storeStatsService.start();
 
+
+        //在Broker是主用模式的时候，启动ScheduleMessageService线程服务；在启动的过程中，
+        // 向每个级别的对应的队列都增加定时任务，周期性的检查队列中是否有延迟消息存在，若有则到期后就执行该延迟消息，
+        // 执行的目的是将真正的消息写入commitlog中，并生成consumequeue和index数据
         if (this.scheduleMessageService != null && SLAVE != messageStoreConfig.getBrokerRole()) {
             this.scheduleMessageService.start();
         }
 
+
+        //在Broker是备用模式的时候，启动ReputMessageService线程服务；
+        // 首先设置该线程服务的reputFromOffset值等于备用Broker本地commitlog文件的最大物理offset值；
+        // 在该线程的run方法中，不断地检查在commitlog文件中reputFromOffset偏移量之后是否有新数据添加，
+        // 若有则对这些数据创建逻辑队列和Index索引；在主从同步时会使用该线程服务
         if (this.getMessageStoreConfig().isDuplicationEnable()) {
             this.reputMessageService.setReputFromOffset(this.commitLog.getConfirmOffset());
         } else {
@@ -232,9 +247,19 @@ public class DefaultMessageStore implements MessageStore {
         }
         this.reputMessageService.start();
 
+
+        //启动HAService线程服务，进行commitlog数据的主备同步
         this.haService.start();
 
+        //在目录$HOME/store下面创建abort文件，没有任何内容；只是标记是否正常关闭，
+        // 若为正常关闭，则在关闭时会删掉此文件；若未正常关闭则此文件一直保留，下次启动时根据是否存在此文件进行不同方式的内存数据恢复
         this.createTempFile();
+
+        //设置定时任务，每隔10秒调用CleanCommitLogService.run和
+        // CleanConsumeQueueService.run方法进行一次资源清理，分别清理物理文件以及对应的逻辑文件
+
+       // 调用TransactionStateService.start方法，在该方法中为每个tranStateTable文件初始化一个定时任务，
+        // 该定时任务的作用是每隔1分钟遍历一遍tranStateTable文件中的数据对于处于PREPARED状态的事务消息，向Producer回查事务消息的最新状态
         this.addScheduleTask();
         this.shutdown = false;
     }
@@ -898,6 +923,7 @@ public class DefaultMessageStore implements MessageStore {
         return this.systemClock.now();
     }
 
+    //未使用的topic数据进行清理
     @Override
     public int cleanUnusedTopic(Set<String> topics) {
         Iterator<Entry<String, ConcurrentMap<Integer, ConsumeQueue>>> it = this.consumeQueueTable.entrySet().iterator();

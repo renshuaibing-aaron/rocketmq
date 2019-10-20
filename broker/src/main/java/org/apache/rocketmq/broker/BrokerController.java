@@ -222,13 +222,21 @@ public class BrokerController {
         return queryThreadPoolQueue;
     }
 
+    /**
+     * Broker的初始化过程
+     * @return
+     * @throws CloneNotSupportedException
+     */
     public boolean initialize() throws CloneNotSupportedException {
         boolean result = this.topicConfigManager.load();
 
+        //配置文件初始化
         result = result && this.consumerOffsetManager.load();
         result = result && this.subscriptionGroupManager.load();
         result = result && this.consumerFilterManager.load();
 
+
+        //初始化DefaultMessageStore对象，该对象是应用层访问存储层的访问类
         if (result) {
             try {
                 this.messageStore =
@@ -245,13 +253,17 @@ public class BrokerController {
             }
         }
 
+        //调用DefaultMessageStore.load加载数据
         result = result && this.messageStore.load();
 
         if (result) {
+            //初始化Netty服务端NettyRemotingServer对象
             this.remotingServer = new NettyRemotingServer(this.nettyServerConfig, this.clientHousekeepingService);
             NettyServerConfig fastConfig = (NettyServerConfig) this.nettyServerConfig.clone();
             fastConfig.setListenPort(nettyServerConfig.getListenPort() - 2);
             this.fastRemotingServer = new NettyRemotingServer(fastConfig, this.clientHousekeepingService);
+
+            //初始化发送消息线程池（sendMessageExecutor）
             this.sendMessageExecutor = new BrokerFixedThreadPoolExecutor(
                 this.brokerConfig.getSendMessageThreadPoolNums(),
                 this.brokerConfig.getSendMessageThreadPoolNums(),
@@ -260,6 +272,7 @@ public class BrokerController {
                 this.sendThreadPoolQueue,
                 new ThreadFactoryImpl("SendMessageThread_"));
 
+            //拉取消息线程池（pullMessageExecutor）
             this.pullMessageExecutor = new BrokerFixedThreadPoolExecutor(
                 this.brokerConfig.getPullMessageThreadPoolNums(),
                 this.brokerConfig.getPullMessageThreadPoolNums(),
@@ -267,6 +280,7 @@ public class BrokerController {
                 TimeUnit.MILLISECONDS,
                 this.pullThreadPoolQueue,
                 new ThreadFactoryImpl("PullMessageThread_"));
+
 
             this.queryMessageExecutor = new BrokerFixedThreadPoolExecutor(
                 this.brokerConfig.getQueryMessageThreadPoolNums(),
@@ -276,10 +290,12 @@ public class BrokerController {
                 this.queryThreadPoolQueue,
                 new ThreadFactoryImpl("QueryMessageThread_"));
 
+            //管理Broker线程池（adminBrokerExecutor）
             this.adminBrokerExecutor =
                 Executors.newFixedThreadPool(this.brokerConfig.getAdminBrokerThreadPoolNums(), new ThreadFactoryImpl(
                     "AdminBrokerThread_"));
 
+            //客户端管理线程池（clientManageExecutor）
             this.clientManageExecutor = new ThreadPoolExecutor(
                 this.brokerConfig.getClientManageThreadPoolNums(),
                 this.brokerConfig.getClientManageThreadPoolNums(),
@@ -308,8 +324,11 @@ public class BrokerController {
                 Executors.newFixedThreadPool(this.brokerConfig.getConsumerManageThreadPoolNums(), new ThreadFactoryImpl(
                     "ConsumerManageThread_"));
 
+            //注册事件处理器
             this.registerProcessor();
 
+
+            //启动如下定时任务
             final long initialDelay = UtilAll.computNextMorningTimeMillis() - System.currentTimeMillis();
             final long period = 1000 * 60 * 60 * 24;
             this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
@@ -540,6 +559,7 @@ public class BrokerController {
         sendProcessor.registerSendMessageHook(sendMessageHookList);
         sendProcessor.registerConsumeMessageHook(consumeMessageHookList);
 
+        //发送消息事件处理器（SendMessageProcessor）
         this.remotingServer.registerProcessor(RequestCode.SEND_MESSAGE, sendProcessor, this.sendMessageExecutor);
         this.remotingServer.registerProcessor(RequestCode.SEND_MESSAGE_V2, sendProcessor, this.sendMessageExecutor);
         this.remotingServer.registerProcessor(RequestCode.SEND_BATCH_MESSAGE, sendProcessor, this.sendMessageExecutor);
@@ -549,13 +569,13 @@ public class BrokerController {
         this.fastRemotingServer.registerProcessor(RequestCode.SEND_BATCH_MESSAGE, sendProcessor, this.sendMessageExecutor);
         this.fastRemotingServer.registerProcessor(RequestCode.CONSUMER_SEND_MSG_BACK, sendProcessor, this.sendMessageExecutor);
         /**
-         * PullMessageProcessor
+         * PullMessageProcessor 拉取消息事件处理器
          */
         this.remotingServer.registerProcessor(RequestCode.PULL_MESSAGE, this.pullMessageProcessor, this.pullMessageExecutor);
         this.pullMessageProcessor.registerConsumeMessageHook(consumeMessageHookList);
 
         /**
-         * QueryMessageProcessor
+         * QueryMessageProcessor查询消息事件处理器
          */
         NettyRequestProcessor queryProcessor = new QueryMessageProcessor(this);
         this.remotingServer.registerProcessor(RequestCode.QUERY_MESSAGE, queryProcessor, this.queryMessageExecutor);
@@ -565,7 +585,7 @@ public class BrokerController {
         this.fastRemotingServer.registerProcessor(RequestCode.VIEW_MESSAGE_BY_ID, queryProcessor, this.queryMessageExecutor);
 
         /**
-         * ClientManageProcessor
+         * ClientManageProcessor 客户端管理事件处理器
          */
         ClientManageProcessor clientProcessor = new ClientManageProcessor(this);
         this.remotingServer.registerProcessor(RequestCode.HEART_BEAT, clientProcessor, this.heartbeatExecutor);
@@ -589,13 +609,13 @@ public class BrokerController {
         this.fastRemotingServer.registerProcessor(RequestCode.QUERY_CONSUMER_OFFSET, consumerManageProcessor, this.consumerManageExecutor);
 
         /**
-         * EndTransactionProcessor
+         * EndTransactionProcessor 结束事务处理器
          */
         this.remotingServer.registerProcessor(RequestCode.END_TRANSACTION, new EndTransactionProcessor(this), this.endTransactionExecutor);
         this.fastRemotingServer.registerProcessor(RequestCode.END_TRANSACTION, new EndTransactionProcessor(this), this.endTransactionExecutor);
 
         /**
-         * Default
+         * Default  默认事件处理器
          */
         AdminBrokerProcessor adminProcessor = new AdminBrokerProcessor(this);
         this.remotingServer.registerDefaultProcessor(adminProcessor, this.adminBrokerExecutor);
@@ -822,11 +842,15 @@ public class BrokerController {
         return this.brokerConfig.getBrokerIP1() + ":" + this.nettyServerConfig.getListenPort();
     }
 
+    //Broker的启动过程
     public void start() throws Exception {
+
+        //调用DefaultMessageStore.start方法启动DefaultMessageStore对象中的一些服务线程
         if (this.messageStore != null) {
             this.messageStore.start();
         }
 
+        //启动Broker的Netty服务端NettyRemotingServer。监听消费者或生产者发起的请求信息并处理
         if (this.remotingServer != null) {
             this.remotingServer.start();
         }
@@ -839,29 +863,62 @@ public class BrokerController {
             this.fileWatchService.start();
         }
 
+        //启动BrokerOuterAPI中的NettyRemotingClient，即建立与NameServer的链接，
+        // 用于自身Broker与其他模块的RPC功能调用；包括获取NameServer的地址、注册Broker、注销Broker、获取Topic配置、获取消息进度信息、获取订阅关系等RPC功能
         if (this.brokerOuterAPI != null) {
             this.brokerOuterAPI.start();
         }
 
+
+        //启动拉消息管理服务PullRequestHoldService，当拉取消息时未发现消息，
+        // 则初始化PullRequeset对象放入该服务线程的pullRequestTable列表中，
+        // 由PullRequestHoldService每隔1秒钟就检查一遍每个PullRequeset对象要读取的数据位置在consumequeue中是否已经有数据了，
+        // 若有则交由PullManageProcessor处理
         if (this.pullRequestHoldService != null) {
             this.pullRequestHoldService.start();
         }
 
+
+        //启动ClientHousekeepingService服务，在启动过程中设置定时任务，该定时任务每隔10秒就检查一次客户端的链接情况，
+        // 清除不活动的链接（即在120秒以内没有数据交互了）
         if (this.clientHousekeepingService != null) {
             this.clientHousekeepingService.start();
         }
 
+        //启动FilterServerManager，每隔30秒定期一次检查Filter Server个数，若没有达到16个则创建
         if (this.filterServerManager != null) {
             this.filterServerManager.start();
         }
 
+        //首先调用BrokerController.registerBrokerAll方法立即向NameServer注册Broker；
+        // 然后设置定时任务，每隔30秒调用一次该方法向NameServer注册
         this.registerBrokerAll(true, false, true);
 
+        /**
+         * 调用BrokerController.registerBrokerAll方法立即向NameServer注册Broker
+         * [
+         * code=103,//这里的103对应的code就是broker向nameserver注册自己的消息
+         * language=JAVA,
+         * version=137,
+         * opaque=58,//这个就是requestId
+         * flag(B)=0,
+         * remark=null,
+         * extFields={
+         *     brokerId=0,
+         *     clusterName=DefaultCluster,
+         *     brokerAddr=ip1: 10911,
+         *     haServerAddr=ip1: 10912,
+         *     brokerName=LAPTOP-SMF2CKDN
+         * },
+         * serializeTypeCurrentRPC=JSON
+         */
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
             public void run() {
                 try {
+                    //boker端心跳包发送？
+                    System.out.println("boker端心跳包发送");
                     BrokerController.this.registerBrokerAll(true, false, brokerConfig.isForceRegister());
                 } catch (Throwable e) {
                     log.error("registerBrokerAll Exception", e);
@@ -869,6 +926,8 @@ public class BrokerController {
             }
         }, 1000 * 10, Math.max(10000, Math.min(brokerConfig.getRegisterNameServerPeriod(), 60000)), TimeUnit.MILLISECONDS);
 
+
+        //
         if (this.brokerStatsManager != null) {
             this.brokerStatsManager.start();
         }
@@ -903,7 +962,14 @@ public class BrokerController {
         doRegisterBrokerAll(true, false, topicConfigSerializeWrapper);
     }
 
+    /**
+     * 注册broker
+     * @param checkOrderConfig
+     * @param oneway
+     * @param forceRegister
+     */
     public synchronized void registerBrokerAll(final boolean checkOrderConfig, boolean oneway, boolean forceRegister) {
+
         TopicConfigSerializeWrapper topicConfigWrapper = this.getTopicConfigManager().buildTopicConfigSerializeWrapper();
 
         if (!PermName.isWriteable(this.getBrokerConfig().getBrokerPermission())

@@ -34,7 +34,9 @@ public class Consumer {
 
         /*
          * Instantiate with specified consumer group name.
+         * 消费组
          */
+        //以consumerGroup名称为参数初始化DefaultMQPushConsumer对象
         DefaultMQPushConsumer consumer = new DefaultMQPushConsumer("please_rename_unique_group_name_4");
 
         /*
@@ -48,35 +50,44 @@ public class Consumer {
          * }
          * </pre>
          */
+        //设置NameServer值；
+        consumer.setNamesrvAddr("127.0.0.1:9876");
+
 
         /*
          * Specify where to start in case the specified consumer group is a brand new one.
+         *
+         * 从何处开始消费？？
          */
         consumer.setConsumeFromWhere(ConsumeFromWhere.CONSUME_FROM_FIRST_OFFSET);
 
         /*
          * Subscribe one more more topics to consume.
+         * 订阅的topic
+         * 构建Consumer端的订阅数据SubscriptionData对象
          */
         consumer.subscribe("TopicTest", "*");
 
         /*
          *  Register callback to execute on arrival of messages fetched from brokers.
+         * 设置拉取消息后的回调类
          */
         consumer.registerMessageListener(new MessageListenerConcurrently() {
 
             @Override
             public ConsumeConcurrentlyStatus consumeMessage(List<MessageExt> msgs,
                 ConsumeConcurrentlyContext context) {
-                System.out.printf("%s Receive New Messages: %s %n", Thread.currentThread().getName(), msgs);
+                System.out.printf("%s 接收到新消息: %s %n", Thread.currentThread().getName(), msgs);
                 return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
             }
         });
 
         /*
          *  Launch the consumer instance.
+         * 启动DefaultMQPushConsumer
          */
         consumer.start();
 
-        System.out.printf("Consumer Started.%n");
+        System.out.printf("rocketMQ消费者启动.%n");
     }
 }
