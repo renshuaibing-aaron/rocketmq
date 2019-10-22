@@ -68,6 +68,7 @@ public class ResponseFuture {
     }
 
     public RemotingCommand waitResponse(final long timeoutMillis) throws InterruptedException {
+        System.out.println("=====发送线程============"+Thread.currentThread());
         this.countDownLatch.await(timeoutMillis, TimeUnit.MILLISECONDS);
         return this.responseCommand;
     }

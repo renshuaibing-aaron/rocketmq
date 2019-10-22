@@ -23,6 +23,10 @@ import org.apache.rocketmq.logging.InternalLoggerFactory;
 import org.apache.rocketmq.namesrv.NamesrvController;
 import org.apache.rocketmq.remoting.ChannelEventListener;
 
+/**
+ * BrokerHousekeepingService对象作为该Netty连接中Socket链接的监听器（ChannelEventListener）；
+ * 监听与Broker建立的渠道的状态（空闲、关闭、异常三个状态），并调用BrokerHousekeepingService的相应onChannel****方法
+ */
 public class BrokerHousekeepingService implements ChannelEventListener {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.NAMESRV_LOGGER_NAME);
     private final NamesrvController namesrvController;

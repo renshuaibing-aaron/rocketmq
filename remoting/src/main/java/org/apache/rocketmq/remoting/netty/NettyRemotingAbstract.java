@@ -91,6 +91,7 @@ public abstract class NettyRemotingAbstract {
 
     /**
      * The default request processor to use in case there is no exact match in {@link #processorTable} per request code.
+     * 默认处理器
      */
     protected Pair<NettyRequestProcessor, ExecutorService> defaultRequestProcessor;
 
@@ -161,6 +162,7 @@ public abstract class NettyRemotingAbstract {
                     processRequestCommand(ctx, cmd);
                     break;
                 case RESPONSE_COMMAND:
+                    System.out.println("========获取 返回值==========");
                     processResponseCommand(ctx, cmd);
                     break;
                 default:
@@ -218,6 +220,7 @@ public abstract class NettyRemotingAbstract {
                                 response.setOpaque(opaque);
                                 response.markResponseType();
                                 try {
+                                    System.out.println("=====cmd.isOnewayRPC()====返回结果=========="+response);
                                     ctx.writeAndFlush(response);
                                 } catch (Throwable e) {
                                     log.error("process request over, but response failed", e);
@@ -288,6 +291,7 @@ public abstract class NettyRemotingAbstract {
         final int opaque = cmd.getOpaque();
         final ResponseFuture responseFuture = responseTable.get(opaque);
         if (responseFuture != null) {
+
             responseFuture.setResponseCommand(cmd);
 
             responseTable.remove(opaque);
@@ -295,6 +299,9 @@ public abstract class NettyRemotingAbstract {
             if (responseFuture.getInvokeCallback() != null) {
                 executeInvokeCallback(responseFuture);
             } else {
+                //同步消息返回值
+                System.out.println("===========NettyRemotingAbstract#processResponseCommand===同步消息返回值==");
+                System.out.println("=====返回值线程============"+Thread.currentThread());
                 responseFuture.putResponse(cmd);
                 responseFuture.release();
             }
@@ -404,16 +411,32 @@ public abstract class NettyRemotingAbstract {
         }
     }
 
+    /**
+     *   发送数据
+     * @param channel
+     * @param request
+     * @param timeoutMillis
+     * @return
+     * @throws InterruptedException
+     * @throws RemotingSendRequestException
+     * @throws RemotingTimeoutException
+     */
     public RemotingCommand invokeSyncImpl(final Channel channel, final RemotingCommand request,
         final long timeoutMillis)
         throws InterruptedException, RemotingSendRequestException, RemotingTimeoutException {
         final int opaque = request.getOpaque();
 
         try {
+            //利用这个responseFuture 控制同步
             final ResponseFuture responseFuture = new ResponseFuture(channel, opaque, timeoutMillis, null, null);
+            //放置responseTable  key是相当于reqeustId，在同一个连接上的不同请求标识码，与响应消息中的相对应
             this.responseTable.put(opaque, responseFuture);
+
             final SocketAddress addr = channel.remoteAddress();
-            channel.writeAndFlush(request).addListener(new ChannelFutureListener() {
+
+            ChannelFuture channelFuture = channel.writeAndFlush(request);
+
+            channelFuture.addListener(new ChannelFutureListener() {
                 @Override
                 public void operationComplete(ChannelFuture f) throws Exception {
                     if (f.isSuccess()) {
@@ -423,6 +446,7 @@ public abstract class NettyRemotingAbstract {
                         responseFuture.setSendRequestOK(false);
                     }
 
+                    System.out.println("======发送消息失败=========");
                     responseTable.remove(opaque);
                     responseFuture.setCause(f.cause());
                     responseFuture.putResponse(null);

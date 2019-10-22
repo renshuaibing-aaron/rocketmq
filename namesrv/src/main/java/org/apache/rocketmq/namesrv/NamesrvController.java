@@ -102,8 +102,8 @@ public class NamesrvController
         this.registerProcessor();
 
 
-        //还有两个定时执行的线程，一个用来扫描失效的 Broker (scanNotActiveBroker)
-        //定时任务 I: NameServer 每隔 I Os 扫描一次 Broker ， 移除处于不激活状态的 Broker
+        //还有两个定时执行的线程：一个用来扫描失效的 Broker (scanNotActiveBroker)
+        //定时任务 I: NameServer 每隔 10s 扫描一次 Broker ， 移除处于不激活状态的 Broker
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable()
         {
 
@@ -117,7 +117,7 @@ public class NamesrvController
 
 
         //另一个用来打印配置信息（ printAllPeriodically ）
-        //定时任务 2: names巳rver 每隔 10 分钟打印一次 KV 配置 。
+        //定时任务 2: nameserver 每隔 10 分钟打印一次 KV 配置 。
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable()
         {
 

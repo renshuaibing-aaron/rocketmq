@@ -104,6 +104,7 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
             publicThreadNums = 4;
         }
 
+        //设置线程池
         this.publicExecutor = Executors.newFixedThreadPool(publicThreadNums, new ThreadFactory() {
             private AtomicInteger threadIndex = new AtomicInteger(0);
 
@@ -133,6 +134,7 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
                 }
             });
         } else {
+            //boss线程
             this.eventLoopGroupBoss = new NioEventLoopGroup(1, new ThreadFactory() {
                 private AtomicInteger threadIndex = new AtomicInteger(0);
 
@@ -142,6 +144,7 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
                 }
             });
 
+            //work线程
             this.eventLoopGroupSelector = new NioEventLoopGroup(nettyServerConfig.getServerSelectorThreads(), new ThreadFactory() {
                 private AtomicInteger threadIndex = new AtomicInteger(0);
                 private int threadTotal = nettyServerConfig.getServerSelectorThreads();
@@ -185,9 +188,7 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
         this.defaultEventExecutorGroup = new DefaultEventExecutorGroup(
             nettyServerConfig.getServerWorkerThreads(),
             new ThreadFactory() {
-
                 private AtomicInteger threadIndex = new AtomicInteger(0);
-
                 @Override
                 public Thread newThread(Runnable r) {
                     return new Thread(r, "NettyServerCodecThread_" + this.threadIndex.incrementAndGet());
@@ -224,6 +225,8 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
                                 new NettyDecoder(),
                                 new IdleStateHandler(0, 0, nettyServerConfig.getServerChannelMaxIdleTimeSeconds()),
                                 new NettyConnectManageHandler(),
+                                //当收到客户端的请求信息之后会初始化一个线程，并放入线程池中进行处理,
+                                 // 该线程调用DefaultRequestProcessor. processRequest方法来处理请求
                                 new NettyServerHandler()
                             );
                     }
@@ -351,6 +354,7 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
         return this.publicExecutor;
     }
 
+    //处理连接请求？
     class HandshakeHandler extends SimpleChannelInboundHandler<ByteBuf> {
 
         private final TlsMode tlsMode;
@@ -417,6 +421,7 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
 
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, RemotingCommand msg) throws Exception {
+            //获取消息
             processMessageReceived(ctx, msg);
         }
     }

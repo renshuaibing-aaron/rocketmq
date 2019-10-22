@@ -123,8 +123,12 @@ public class BrokerOuterAPI {
         final int timeoutMills,
         final boolean compressed) {
 
+
         final List<RegisterBrokerResult> registerBrokerResultList = Lists.newArrayList();
+
         List<String> nameServerAddressList = this.remotingClient.getNameServerAddressList();
+
+
         if (nameServerAddressList != null && nameServerAddressList.size() > 0) {
 
             final RegisterBrokerRequestHeader requestHeader = new RegisterBrokerRequestHeader();
@@ -139,8 +143,11 @@ public class BrokerOuterAPI {
             requestBody.setTopicConfigSerializeWrapper(topicConfigWrapper);
             requestBody.setFilterServerList(filterServerList);
             final byte[] body = requestBody.encode(compressed);
+
             final int bodyCrc32 = UtilAll.crc32(body);
+
             requestHeader.setBodyCrc32(bodyCrc32);
+            //加锁
             final CountDownLatch countDownLatch = new CountDownLatch(nameServerAddressList.size());
             for (final String namesrvAddr : nameServerAddressList) {
                 //遍历所有 NameServer 列表
@@ -170,6 +177,7 @@ public class BrokerOuterAPI {
             }
         }
 
+        System.out.println("========BrokerOuterAPI#registerBrokerAll===registerBrokerResultList==============="+registerBrokerResultList);
         return registerBrokerResultList;
     }
 
@@ -181,6 +189,7 @@ public class BrokerOuterAPI {
         final byte[] body
     ) throws RemotingCommandException, MQBrokerException, RemotingConnectException, RemotingSendRequestException, RemotingTimeoutException,
         InterruptedException {
+
         RemotingCommand request = RemotingCommand.createRequestCommand(RequestCode.REGISTER_BROKER, requestHeader);
         request.setBody(body);
 
@@ -193,8 +202,7 @@ public class BrokerOuterAPI {
             return null;
         }
 
-        //发送心跳包具体逻辑
-        System.out.println("发送心跳包具体逻辑");
+        System.out.println("=============BrokerOuterAPI#registerBroker====invokeSync========="+namesrvAddr);
         RemotingCommand response = this.remotingClient.invokeSync(namesrvAddr, request, timeoutMills);
         assert response != null;
         switch (response.getCode()) {
