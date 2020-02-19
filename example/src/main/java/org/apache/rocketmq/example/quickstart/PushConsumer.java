@@ -1,22 +1,5 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package org.apache.rocketmq.example.quickstart;
 
-import java.util.List;
 import org.apache.rocketmq.client.consumer.DefaultMQPushConsumer;
 import org.apache.rocketmq.client.consumer.listener.ConsumeConcurrentlyContext;
 import org.apache.rocketmq.client.consumer.listener.ConsumeConcurrentlyStatus;
@@ -25,10 +8,13 @@ import org.apache.rocketmq.client.exception.MQClientException;
 import org.apache.rocketmq.common.consumer.ConsumeFromWhere;
 import org.apache.rocketmq.common.message.MessageExt;
 
+import java.util.List;
+
 /**
+ * todo 默认的消费者实现方式
  * This example shows how to subscribe and consume messages using providing {@link DefaultMQPushConsumer}.
  */
-public class Consumer {
+public class PushConsumer {
 
     public static void main(String[] args) throws InterruptedException, MQClientException {
 
@@ -68,19 +54,17 @@ public class Consumer {
          */
         consumer.subscribe("TopicTest", "*");
 
+        //注意这里有个坑 当consumer消费者先启动时  不会生效 其实还是一条一条的消费  原因消费者启动了 不断轮训生产者
+        //生产者 写数据 还是一条一条写的
+        //为了使这个生效 需要先启动生产者 写一些数据 然后 消费者会进行
+        consumer.setConsumeMessageBatchMaxSize(10);
+
+
         /*
          *  Register callback to execute on arrival of messages fetched from brokers.
          * 设置拉取消息后的回调类
          */
-        consumer.registerMessageListener(new MessageListenerConcurrently() {
-
-            @Override
-            public ConsumeConcurrentlyStatus consumeMessage(List<MessageExt> msgs,
-                ConsumeConcurrentlyContext context) {
-                System.out.printf("%s 接收到新消息: %s %n", Thread.currentThread().getName(), msgs);
-                return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
-            }
-        });
+        consumer.registerMessageListener(new MessageListenerConcurrentlyImpl());
 
         /*
          *  Launch the consumer instance.
@@ -90,4 +74,18 @@ public class Consumer {
 
         System.out.printf("rocketMQ消费者启动.%n");
     }
+
+    /**
+     * 回调方法 在进行push时 当有消息时可以 可以回调这个方法
+     */
+    static class MessageListenerConcurrentlyImpl implements MessageListenerConcurrently {
+        @Override
+        public ConsumeConcurrentlyStatus consumeMessage(List<MessageExt> msgs, ConsumeConcurrentlyContext context) {
+            System.out.println("接受消息的数量是" + msgs.size());
+            // System.out.printf("%s 接收到新消息: %s %n", Thread.currentThread().getName(), msgs);
+            return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
+        }
+    }
+
+
 }

@@ -50,7 +50,7 @@ public class SimplePullConsumer {
         consumer.attachQueue(queueName);
 
         consumer.startup();
-        System.out.printf("Consumer startup OK%n");
+        System.out.printf("PushConsumer startup OK%n");
 
         // Keep running until we find the one that has just been sent
         boolean stop = false;

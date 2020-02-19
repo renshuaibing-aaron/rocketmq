@@ -1,19 +1,3 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package org.apache.rocketmq.client.impl.consumer;
 
 import java.util.ArrayList;
@@ -565,40 +549,54 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                 //将serviceState置为start_failed,以免客户端同一个进程中重复启动
                 this.serviceState = ServiceState.START_FAILED;
 
-                //检查各参数是否正确
+                //检查各参数是否正确 注意消费组名字不能是DEFAULT_CONSUMER
                 this.checkConfig();
 
                 //在应用层对DefaultMQPushConsumer.subscription变量进行的设置，要将此Map变量值转换为SubscriptionData对象
+                // 将DefaultMQPushConsumer的订阅信息copy到RebalanceService中
+                // 如果是cluster模式，如果订阅了topic,则自动订阅%RETRY%groupname，也加入到RebalanceService中
                 this.copySubscription();
 
                 if (this.defaultMQPushConsumer.getMessageModel() == MessageModel.CLUSTERING) {
+
+                    // 如果InstanceName参数值为DEFAULT则修改为PID
                     this.defaultMQPushConsumer.changeInstanceNameToPID();
                 }
 
 
                 //创建MQClientInstance对象
+                // 新建一个MQClientInstance,客户端管理类, 单例，一个进程中只有一个
+                // 所有的i/o类操作由它管理，缓存客户端和topic信息，各种service，很重要
                 this.mQClientFactory = MQClientManager.getInstance().getAndCreateMQClientInstance(this.defaultMQPushConsumer, this.rpcHook);
 
 
 
                 this.rebalanceImpl.setConsumerGroup(this.defaultMQPushConsumer.getConsumerGroup());
                 this.rebalanceImpl.setMessageModel(this.defaultMQPushConsumer.getMessageModel());
+
+                //5、Queue分配策略，默认AVG
                 this.rebalanceImpl.setAllocateMessageQueueStrategy(this.defaultMQPushConsumer.getAllocateMessageQueueStrategy());
                 this.rebalanceImpl.setmQClientFactory(this.mQClientFactory);
 
 
+                // PullRequest封装实现类，封装了和broker的通信接口
                 this.pullAPIWrapper = new PullAPIWrapper(
                     mQClientFactory,
                     this.defaultMQPushConsumer.getConsumerGroup(), isUnitMode());
+
+                // 消息被客户端过滤时会回调的钩子
                 this.pullAPIWrapper.registerFilterMessageHook(filterMessageHookList);
 
+                // consumer客户端消费offset持久化
                 if (this.defaultMQPushConsumer.getOffsetStore() != null) {
                     this.offsetStore = this.defaultMQPushConsumer.getOffsetStore();
                 } else {
                     switch (this.defaultMQPushConsumer.getMessageModel()) {
+                        // 广播消息本地持久化offset
                         case BROADCASTING:
                             this.offsetStore = new LocalFileOffsetStore(this.mQClientFactory, this.defaultMQPushConsumer.getConsumerGroup());
                             break;
+                        // 集群模式broker持久化offset
                         case CLUSTERING:
                             this.offsetStore = new RemoteBrokerOffsetStore(this.mQClientFactory, this.defaultMQPushConsumer.getConsumerGroup());
                             break;
@@ -607,8 +605,10 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                     }
                     this.defaultMQPushConsumer.setOffsetStore(this.offsetStore);
                 }
+                // 如果是广播模式则从本地文件中load，如果是集群模式不做操作
                 this.offsetStore.load();
 
+                // 消息消费服务，顺序和并发消息逻辑不同,接收消息并调用listener消费，处理消费结果
                 if (this.getMessageListenerInner() instanceof MessageListenerOrderly) {
                     this.consumeOrderly = true;
                     this.consumeMessageService =
@@ -619,8 +619,10 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                         new ConsumeMessageConcurrentlyService(this, (MessageListenerConcurrently) this.getMessageListenerInner());
                 }
 
+                // 启动等待处理消息服务（定时服务）
                 this.consumeMessageService.start();
 
+                // 注册Consumer 保证CID是单例模式
                 boolean registerOK = mQClientFactory.registerConsumer(this.defaultMQPushConsumer.getConsumerGroup(), this);
                 if (!registerOK) {
                     this.serviceState = ServiceState.CREATE_JUST;
@@ -630,8 +632,10 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                         null);
                 }
 
+                //13、启动MQClientInstance，会启动PullMessageService和RebalanceService
                 mQClientFactory.start();
                 log.info("the consumer [{}] start OK.", this.defaultMQPushConsumer.getConsumerGroup());
+                // 改变状态
                 this.serviceState = ServiceState.RUNNING;
                 break;
             case RUNNING:
@@ -645,9 +649,13 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                 break;
         }
 
+        //14、从NameServer更新topic路由和订阅信息
         this.updateTopicSubscribeInfoWhenSubscriptionChanged();
+        //如果是SQL过滤，检查broker是否支持SQL过滤
         this.mQClientFactory.checkClientInBroker();
+        //15、发送心跳，同步consumer配置到broker,同步FilterClass到FilterServer(PushConsumer)
         this.mQClientFactory.sendHeartbeatToAllBrokerWithLock();
+        //16、做一次re-balance
         this.mQClientFactory.rebalanceImmediately();
     }
 

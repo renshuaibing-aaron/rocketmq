@@ -56,6 +56,6 @@ public class SqlConsumer {
             e.printStackTrace();
             return;
         }
-        System.out.printf("Consumer Started.%n");
+        System.out.printf("PushConsumer Started.%n");
     }
 }

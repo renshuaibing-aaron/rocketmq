@@ -65,7 +65,7 @@ public class Consumer {
 
             consumer.start();
 
-            System.out.printf("Consumer Started.%n");
+            System.out.printf("PushConsumer Started.%n");
         }
     }
 
@@ -75,7 +75,7 @@ public class Consumer {
         opt.setRequired(false);
         options.addOption(opt);
 
-        opt = new Option("g", "consumerGroup", true, "Consumer Group Name");
+        opt = new Option("g", "consumerGroup", true, "PushConsumer Group Name");
         opt.setRequired(true);
         options.addOption(opt);
 

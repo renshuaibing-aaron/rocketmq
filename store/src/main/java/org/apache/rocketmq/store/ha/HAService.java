@@ -174,6 +174,7 @@ public class HAService {
             this.serverSocketChannel = ServerSocketChannel.open();
             this.selector = RemotingUtil.openSelector();
             this.serverSocketChannel.socket().setReuseAddress(true);
+            System.out.println("000000000000000000"+this.socketAddressListen);
             this.serverSocketChannel.socket().bind(this.socketAddressListen);
             this.serverSocketChannel.configureBlocking(false);
             this.serverSocketChannel.register(this.selector, SelectionKey.OP_ACCEPT);

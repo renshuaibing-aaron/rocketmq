@@ -146,7 +146,7 @@ public class Consumer {
 
         consumer.start();
 
-        System.out.printf("Consumer Started.%n");
+        System.out.printf("PushConsumer Started.%n");
     }
 
     public static Options buildCommandlineOptions(final Options options) {
@@ -154,11 +154,11 @@ public class Consumer {
         opt.setRequired(false);
         options.addOption(opt);
 
-        opt = new Option("g", "group", true, "Consumer group name, Default: benchmark_consumer");
+        opt = new Option("g", "group", true, "PushConsumer group name, Default: benchmark_consumer");
         opt.setRequired(false);
         options.addOption(opt);
 
-        opt = new Option("p", "group prefix enable", true, "Consumer group name, Default: false");
+        opt = new Option("p", "group prefix enable", true, "PushConsumer group name, Default: false");
         opt.setRequired(false);
         options.addOption(opt);
 

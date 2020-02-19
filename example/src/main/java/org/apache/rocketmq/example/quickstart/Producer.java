@@ -27,6 +27,7 @@ public class Producer {
          * }
          * </pre>
          */
+        //todo
         producer.setNamesrvAddr("127.0.0.1:9876");
         /*
          * Launch the instance.
@@ -34,7 +35,7 @@ public class Producer {
         producer.start();
 
         //发送10条信息
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 1; i++) {
             try {
 
                 /*

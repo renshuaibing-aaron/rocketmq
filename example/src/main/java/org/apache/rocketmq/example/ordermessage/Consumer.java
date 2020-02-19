@@ -59,7 +59,7 @@ public class Consumer {
         });
 
         consumer.start();
-        System.out.printf("Consumer Started.%n");
+        System.out.printf("PushConsumer Started.%n");
     }
 
 }

@@ -51,6 +51,6 @@ public class SimplePushConsumer {
         });
 
         consumer.startup();
-        System.out.printf("Consumer startup OK%n");
+        System.out.printf("PushConsumer startup OK%n");
     }
 }
