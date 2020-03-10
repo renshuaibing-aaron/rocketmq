@@ -1,0 +1,4 @@
+1.其实这个意思是这样的消费者基于什么策略选择Master或者Slave进行拉取消息呢？
+首先了解一个概念 OS cache 也就是说不论是broker写数据到commitlog文件里面还是 broker读取数据到os里面 都是在
+os cache 这样保证了较高的速率 很内存差不多 broker一旦发现消息队列里面挤压的消息太多  便会告知消费者 让其往slave中
+拉取消息

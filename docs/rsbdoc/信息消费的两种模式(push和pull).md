@@ -2,6 +2,10 @@
 pull：消费者主动拉取pull消息，没有则返回
 push：这个名为push 本质还是pull，是消费者主动循环发送pull请求到broker ，如果没有消息broker会把请求放入等待队列 新消息到达了返回response
 
+在项目中一般都使用push模式 因为push模式实现比较简单，并且push的本质还是pull模式 
+push模式的过程大致是这样的  消费者发送请求到broker  有消息直接返回 实际就是回调在消费者里面写的方法 消费完毕后 继续请求 一旦broker里面没有消息
+这个线程会挂起 然后broker会后台有个线程不断轮询 是不是有消息
+
 
 
 2.消费模式共有两种：Broadcast和Cluster  在初始化消费者时设置
