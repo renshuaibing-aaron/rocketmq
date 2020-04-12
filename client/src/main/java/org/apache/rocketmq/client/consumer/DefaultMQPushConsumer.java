@@ -595,7 +595,7 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
 
     /**
      * Register a callback to execute on message arrival for concurrent consuming.
-     *
+     *注册消息监听器。
      * @param messageListener message handling callback.
      */
     @Override
@@ -663,6 +663,7 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
      */
     @Override
     public void unsubscribe(String topic) {
+        //移除订阅主题集合( subscriptionInner )
         this.defaultMQPushConsumerImpl.unsubscribe(topic);
     }
 

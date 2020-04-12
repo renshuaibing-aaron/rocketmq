@@ -1,19 +1,3 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package org.apache.rocketmq.client.consumer.store;
 
 import java.io.File;
@@ -36,6 +20,7 @@ import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.remoting.exception.RemotingException;
 
 /**
+ * 本地文件消费进度 在广播模式下使用
  * Local storage implementation
  */
 public class LocalFileOffsetStore implements OffsetStore {
@@ -58,12 +43,18 @@ public class LocalFileOffsetStore implements OffsetStore {
             "offsets.json";
     }
 
+    /**
+     * 从本地文件加载消费进度到内存
+     * @throws MQClientException
+     */
     @Override
     public void load() throws MQClientException {
+        // 从本地硬盘读取消费进度
         OffsetSerializeWrapper offsetSerializeWrapper = this.readLocalOffset();
         if (offsetSerializeWrapper != null && offsetSerializeWrapper.getOffsetTable() != null) {
             offsetTable.putAll(offsetSerializeWrapper.getOffsetTable());
 
+            // 打印每个消息队列的消费进度
             for (MessageQueue mq : offsetSerializeWrapper.getOffsetTable().keySet()) {
                 AtomicLong offset = offsetSerializeWrapper.getOffsetTable().get(mq);
                 log.info("load consumer's offset, {} {} {}",
@@ -106,6 +97,7 @@ public class LocalFileOffsetStore implements OffsetStore {
                     }
                 }
                 case READ_FROM_STORE: {
+                    //从本地文件读取
                     OffsetSerializeWrapper offsetSerializeWrapper;
                     try {
                         offsetSerializeWrapper = this.readLocalOffset();
@@ -128,10 +120,15 @@ public class LocalFileOffsetStore implements OffsetStore {
         return -1;
     }
 
+    /**
+     *  持久化消费进度。将消费进度写入文件
+     * @param mqs
+     */
     @Override
     public void persistAll(Set<MessageQueue> mqs) {
-        if (null == mqs || mqs.isEmpty())
+        if (null == mqs || mqs.isEmpty()) {
             return;
+        }
 
         OffsetSerializeWrapper offsetSerializeWrapper = new OffsetSerializeWrapper();
         for (Map.Entry<MessageQueue, AtomicLong> entry : this.offsetTable.entrySet()) {

@@ -1,19 +1,3 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package org.apache.rocketmq.client.impl.consumer;
 
 import java.util.ArrayList;
@@ -35,6 +19,7 @@ import org.apache.rocketmq.common.message.MessageExt;
 import org.apache.rocketmq.common.protocol.body.ProcessQueueInfo;
 
 /**
+ * 消息处理队列
  * Queue consumption snapshot
  */
 public class ProcessQueue {
@@ -74,12 +59,14 @@ public class ProcessQueue {
      * @param pushConsumer
      */
     public void cleanExpiredMsg(DefaultMQPushConsumer pushConsumer) {
+        // 顺序消费时，直接返回
         if (pushConsumer.getDefaultMQPushConsumerImpl().isConsumeOrderly()) {
             return;
         }
-
-        int loop = msgTreeMap.size() < 16 ? msgTreeMap.size() : 16;
+        // 循环移除消息
+        int loop = msgTreeMap.size() < 16 ? msgTreeMap.size() : 16;  //// 每次循环最多移除16条
         for (int i = 0; i < loop; i++) {
+            // 获取第一条消息。判断是否超时，若不超时，则结束循环
             MessageExt msg = null;
             try {
                 this.lockTreeMap.readLock().lockInterruptibly();
@@ -98,11 +85,12 @@ public class ProcessQueue {
             }
 
             try {
-
+                // 发回超时消息
                 pushConsumer.sendMessageBack(msg, 3);
                 log.info("send expire msg back. topic={}, msgId={}, storeHost={}, queueId={}, queueOffset={}", msg.getTopic(), msg.getMsgId(), msg.getStoreHost(), msg.getQueueId(), msg.getQueueOffset());
                 try {
                     this.lockTreeMap.writeLock().lockInterruptibly();
+                    // 判断此时消息是否依然是第一条，若是，则进行移除
                     try {
                         if (!msgTreeMap.isEmpty() && msg.getQueueOffset() == msgTreeMap.firstKey()) {
                             try {
@@ -181,7 +169,13 @@ public class ProcessQueue {
         return 0;
     }
 
+    /**
+     * 移除消息，并返回第一条消息队列位置
+     * @param msgs
+     * @return
+     */
     public long removeMessage(final List<MessageExt> msgs) {
+        System.out.println("【消费者消费过后？成功失败？移除消息，并返回第一条消息队列位置】");
         long result = -1;
         final long now = System.currentTimeMillis();
         try {
@@ -189,7 +183,9 @@ public class ProcessQueue {
             this.lastConsumeTimestamp = now;
             try {
                 if (!msgTreeMap.isEmpty()) {
+                    // 这里+1的原因是：如果msgTreeMap为空时，下一条获得的消息位置为queueOffsetMax+1
                     result = this.queueOffsetMax + 1;
+                    // 移除消息
                     int removedCnt = 0;
                     for (MessageExt msg : msgs) {
                         MessageExt prev = msgTreeMap.remove(msg.getQueueOffset());

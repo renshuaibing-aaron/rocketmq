@@ -138,6 +138,7 @@ public class HAService {
     }
 
     /**
+     * 接收 Slave节点 连接
      * Listens to slave connections to create {@link HAConnection}.
      */
     class AcceptSocketService extends ServiceThread {
@@ -308,6 +309,9 @@ public class HAService {
         }
     }
 
+    /**
+     * 对 Master节点 连接、读写数据
+     */
     class HAClient extends ServiceThread {
         private static final int READ_MAX_BUFFER_SIZE = 1024 * 1024 * 4;
         private final AtomicReference<String> masterAddress = new AtomicReference<>();

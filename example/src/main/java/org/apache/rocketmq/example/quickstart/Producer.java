@@ -29,19 +29,19 @@ public class Producer {
          */
         //todo
         producer.setNamesrvAddr("127.0.0.1:9876");
+
         /*
          * Launch the instance.
          */
         producer.start();
-
         //发送10条信息
-        for (int i = 0; i < 1; i++) {
+        for (int i = 0; i <1; i++) {
             try {
 
                 /*
                  * Create a message instance, specifying topic, tag and message body.
                  */
-                Message msg = new Message("TopicTest" /* Topic */,
+                Message msg = new Message("20200406topic" /* Topic */,
                     "TagA" /* Tag */,
                     ("你好 RocketMQ,这是一条测试消息 " + i).getBytes(RemotingHelper.DEFAULT_CHARSET) /* Message body */
                 );

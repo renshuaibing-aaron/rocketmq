@@ -14,4 +14,12 @@ rocketMQ的事务消息解决了这个问题 就是 本地事务和消息发送�
 
 2.rocketMQ的事务消息的底层原理
 
+我的理解 rocketMq的事务利用half消息机制 保证了消息的发送和本地事务能够同时成功和同时失败 但是不能保证 消费一定成功 
+如果出现消费时 消费失败的情况 需要用户手工处理
+
+https://www.cnblogs.com/qdhxhz/p/11172585.html
+
+主要了解rocketMq分布式事务的原理
+https://blog.csdn.net/prestigeding/article/details/81277067
+
 

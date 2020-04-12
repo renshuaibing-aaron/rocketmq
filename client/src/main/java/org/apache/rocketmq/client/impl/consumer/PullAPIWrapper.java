@@ -1,19 +1,3 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package org.apache.rocketmq.client.impl.consumer;
 
 import java.nio.ByteBuffer;
@@ -54,9 +38,17 @@ public class PullAPIWrapper {
     private final MQClientInstance mQClientFactory;
     private final String consumerGroup;
     private final boolean unitMode;
+    /**
+     * 消息队列 与 拉取Broker 的映射
+     * 当拉取消息时，会通过该映射获取拉取请求对应的Broker
+     */
     private ConcurrentMap<MessageQueue, AtomicLong/* brokerId */> pullFromWhichNodeTable =
         new ConcurrentHashMap<MessageQueue, AtomicLong>(32);
+
+    //是否使用默认Broker
     private volatile boolean connectBrokerByUser = false;
+
+    //默认Broker编号
     private volatile long defaultBrokerId = MixAll.MASTER_ID;
     private Random random = new Random(System.currentTimeMillis());
     private ArrayList<FilterMessageHook> filterMessageHookList = new ArrayList<FilterMessageHook>();
@@ -139,6 +131,26 @@ public class PullAPIWrapper {
         }
     }
 
+    /**
+     * 拉取消息核心方法
+     * @param mq 消息队列
+     * @param subExpression 订阅表达式
+     * @param expressionType
+     * @param subVersion 订阅版本号
+     * @param offset 拉取队列开始位置
+     * @param maxNums 拉取消息数量
+     * @param sysFlag 拉取请求系统标识
+     * @param commitOffset  提交消费进度
+     * @param brokerSuspendMaxTimeMillis broker挂起请求最大时间
+     * @param timeoutMillis 请求broker超时时长
+     * @param communicationMode 通讯模式
+     * @param pullCallback 拉取回调
+     * @return  拉取消息结果。只有通讯模式为同步时，才返回结果，否则返回null。
+     * @throws MQClientException 当寻找不到 broker 时，或发生其他client异常
+     * @throws RemotingException  当远程调用发生异常时
+     * @throws MQBrokerException  发生异常时。只有通讯模式为同步时才会发生该异常。
+     * @throws InterruptedException  当发生中断异常时
+     */
     public PullResult pullKernelImpl(
         final MessageQueue mq,
         final String subExpression,
@@ -153,6 +165,8 @@ public class PullAPIWrapper {
         final CommunicationMode communicationMode,
         final PullCallback pullCallback
     ) throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
+
+        // 获取Broker信息
         FindBrokerResult findBrokerResult =
             this.mQClientFactory.findBrokerAddressInSubscribe(mq.getBrokerName(),
                 this.recalculatePullFromWhichNode(mq), false);
@@ -162,7 +176,7 @@ public class PullAPIWrapper {
                 this.mQClientFactory.findBrokerAddressInSubscribe(mq.getBrokerName(),
                     this.recalculatePullFromWhichNode(mq), false);
         }
-
+        // 请求拉取消息
         if (findBrokerResult != null) {
             {
                 // check version
@@ -205,20 +219,27 @@ public class PullAPIWrapper {
 
             return pullResult;
         }
-
+        // Broker信息不存在，则抛出异常
         throw new MQClientException("The broker[" + mq.getBrokerName() + "] not exist", null);
     }
 
+    /**
+     * 计算消息队列拉取消息对应的Broker编号
+     * @param mq  消息队列
+     * @return  Broker编号
+     */
     public long recalculatePullFromWhichNode(final MessageQueue mq) {
+        System.out.println("============【消费消息】计算消息队列拉取消息对应的Broker编号==================");
+        // 若开启默认Broker开关，则返回默认Broker编号
         if (this.isConnectBrokerByUser()) {
             return this.defaultBrokerId;
         }
-
+        // 若消息队列映射拉取Broker存在，则返回映射Broker编号
         AtomicLong suggest = this.pullFromWhichNodeTable.get(mq);
         if (suggest != null) {
             return suggest.get();
         }
-
+        // 返回Broker主节点编号
         return MixAll.MASTER_ID;
     }
 

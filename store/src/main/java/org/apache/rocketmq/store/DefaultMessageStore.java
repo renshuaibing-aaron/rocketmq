@@ -44,6 +44,10 @@ import org.apache.rocketmq.store.stats.BrokerStatsManager;
 
 import static org.apache.rocketmq.store.config.BrokerRole.SLAVE;
 
+/**
+ *
+ * RocketMQ 的存储核心类为 DefaultMessageStore,存储消息的入口方法为：putMessage
+ */
 public class DefaultMessageStore implements MessageStore {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
 
@@ -248,6 +252,7 @@ public class DefaultMessageStore implements MessageStore {
         this.shutdown = false;
     }
 
+    @Override
     public void shutdown() {
         if (!this.shutdown) {
             this.shutdown = true;
@@ -312,12 +317,13 @@ public class DefaultMessageStore implements MessageStore {
     }
 
     /**
-     * 文件存储的核心方法
+     * 文件存储的核心方法 最终存储需要 CommitLog 实现
      * @param msg Message instance to store
      * @return
      */
+    @Override
     public PutMessageResult putMessage(MessageExtBrokerInner msg) {
-        System.out.println("==========进入文件存储方法==============");
+        System.out.println(("【Broker文件储存方法】"));
         if (this.shutdown) {
             log.warn("message store has shutdown, so putMessage is forbidden");
             return new PutMessageResult(PutMessageStatus.SERVICE_NOT_AVAILABLE, null);
@@ -376,6 +382,7 @@ public class DefaultMessageStore implements MessageStore {
         return result;
     }
 
+    @Override
     public PutMessageResult putMessages(MessageExtBatch messageExtBatch) {
         if (this.shutdown) {
             log.warn("DefaultMessageStore has shutdown, so putMessages is forbidden");

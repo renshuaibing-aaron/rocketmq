@@ -1,19 +1,3 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package org.apache.rocketmq.client.impl.factory;
 
 import java.io.UnsupportedEncodingException;
@@ -82,6 +66,9 @@ import org.apache.rocketmq.remoting.exception.RemotingException;
 import org.apache.rocketmq.remoting.netty.NettyClientConfig;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 
+/**
+ * 封装对 Namesrv，Broker 的 API调用，提供给 Producer、Consumer 使用
+ */
 public class MQClientInstance {
     private final static long LOCK_TIMEOUT_MILLIS = 3000;
     private final InternalLogger log = ClientLogger.getLog();
@@ -974,11 +961,24 @@ public class MQClientInstance {
         this.rebalanceService.wakeup();
     }
 
+    /**
+     * 三个时机会进行消息队列的分配
+     *      ？等待超时，每 20s 调用一次。
+     *      PushConsumer 启动时，调用 rebalanceService#wakeup(...) 触发。
+     *      Broker 通知 Consumer 加入 或 移除时，Consumer 响应通知，调用 rebalanceService#wakeup(...) 触发
+     * 遍历当前 Client 包含的 consumerTable( Consumer集合 )，执行消息队列分配
+     */
     public void doRebalance() {
-        for (Map.Entry<String, MQConsumerInner> entry : this.consumerTable.entrySet()) {
+
+        //遍历当前 Client 包含的 consumerTable( Consumer集合 )，执行消息队列分配
+        //这里获取的是这个客户端的消费者集合
+        Set<Entry<String, MQConsumerInner>> entries = this.consumerTable.entrySet();
+
+        for (Map.Entry<String, MQConsumerInner> entry :entries) {
             MQConsumerInner impl = entry.getValue();
             if (impl != null) {
                 try {
+                    //进行队列分配DefaultMQPushConsumerImpl、DefaultMQPullConsumerImpl 分别对该接口方法进行了实现
                     impl.doRebalance();
                 } catch (Throwable e) {
                     log.error("doRebalance exception", e);
@@ -1034,11 +1034,19 @@ public class MQClientInstance {
         return null;
     }
 
+    /**
+     * 获取 Broker 信息(Broker 地址、是否为从节点)
+     * @param brokerName
+     * @param brokerId
+     * @param onlyThisBroker
+     * @return
+     */
     public FindBrokerResult findBrokerAddressInSubscribe(
         final String brokerName,
         final long brokerId,
         final boolean onlyThisBroker
     ) {
+        System.out.println("==============【消息拉取】获取 Broker 信息(Broker 地址、是否为从节点)=====================");
         String brokerAddr = null;
         boolean slave = false;
         boolean found = false;

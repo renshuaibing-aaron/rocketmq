@@ -52,7 +52,7 @@ public class PushConsumer {
          * 订阅的topic
          * 构建Consumer端的订阅数据SubscriptionData对象
          */
-        consumer.subscribe("TopicTest", "*");
+        consumer.subscribe("20200406topic", "*");
 
         //注意这里有个坑 当consumer消费者先启动时  不会生效 其实还是一条一条的消费  原因消费者启动了 不断轮训生产者
         //生产者 写数据 还是一条一条写的
