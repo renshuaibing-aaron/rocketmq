@@ -1,0 +1,6 @@
+tree ee2335b964e96370f1c3f0198da4e3ba153606bc
+parent c3c4e7b9e21e8a3ca3d5e23272bb1c8e00bf63db
+author yukon <yukon@apache.org> 1507541051 +0800
+committer yukon <yukon@apache.org> 1507541051 +0800
+
+[ROCKETMQ-302] TLP clean up, changes version to 4.2.0-SNAPSHOT
