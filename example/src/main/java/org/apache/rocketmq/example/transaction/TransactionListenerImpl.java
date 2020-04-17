@@ -13,6 +13,8 @@ public class TransactionListenerImpl implements TransactionListener {
 
     private ConcurrentHashMap<String, Integer> localTrans = new ConcurrentHashMap<>();
 
+
+    //执行本地事务的实现
     @Override
     public LocalTransactionState executeLocalTransaction(Message msg, Object arg) {
         int value = transactionIndex.getAndIncrement();
@@ -21,6 +23,8 @@ public class TransactionListenerImpl implements TransactionListener {
         return LocalTransactionState.UNKNOW;
     }
 
+    //Broker回查消息的逻辑
+    //在这个版本里面 实际上是没有用的 请看DefaultMQProducerImpl
     @Override
     public LocalTransactionState checkLocalTransaction(MessageExt msg) {
         Integer status = localTrans.get(msg.getTransactionId());

@@ -161,7 +161,7 @@ public class BrokerOuterAPI {
             }
         }
 
-        System.out.println("========BrokerOuterAPI#registerBrokerAll===registerBrokerResultList==============="+registerBrokerResultList);
+        //System.out.println("========BrokerOuterAPI#registerBrokerAll===registerBrokerResultList==============="+registerBrokerResultList);
         return registerBrokerResultList;
     }
 
@@ -186,7 +186,7 @@ public class BrokerOuterAPI {
             return null;
         }
 
-        System.out.println("=============BrokerOuterAPI#registerBroker====invokeSync========="+namesrvAddr);
+       // System.out.println("=============BrokerOuterAPI#registerBroker====invokeSync========="+namesrvAddr);
         RemotingCommand response = this.remotingClient.invokeSync(namesrvAddr, request, timeoutMills);
         assert response != null;
         switch (response.getCode()) {

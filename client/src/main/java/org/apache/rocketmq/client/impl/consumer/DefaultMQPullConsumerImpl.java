@@ -1,19 +1,3 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package org.apache.rocketmq.client.impl.consumer;
 
 import java.util.ArrayList;
@@ -579,6 +563,10 @@ public class DefaultMQPullConsumerImpl implements MQConsumerInner {
         }
     }
 
+    /**
+     * 消费者启动
+     * @throws MQClientException
+     */
     public synchronized void start() throws MQClientException {
         switch (this.serviceState) {
             case CREATE_JUST:
@@ -586,24 +574,30 @@ public class DefaultMQPullConsumerImpl implements MQConsumerInner {
 
                 this.checkConfig();
 
+                //根据注册的主题，构建订阅信息，放入到RebalanceImpl的订阅表中
+                //DefaultMQPullConsumerImpl 可以注册多个主题，但多个主题使用同一个消息处理监听器
                 this.copySubscription();
 
                 if (this.defaultMQPullConsumer.getMessageModel() == MessageModel.CLUSTERING) {
                     this.defaultMQPullConsumer.changeInstanceNameToPID();
                 }
 
+                //创建MQClientInstance,每一个clientConfig 一个 MqClientInstance 对象
                 this.mQClientFactory = MQClientManager.getInstance().getAndCreateMQClientInstance(this.defaultMQPullConsumer, this.rpcHook);
-
+                ///填充 rebalanceImpl 对象的消费组、消息队列分配器、消费模式
                 this.rebalanceImpl.setConsumerGroup(this.defaultMQPullConsumer.getConsumerGroup());
                 this.rebalanceImpl.setMessageModel(this.defaultMQPullConsumer.getMessageModel());
                 this.rebalanceImpl.setAllocateMessageQueueStrategy(this.defaultMQPullConsumer.getAllocateMessageQueueStrategy());
                 this.rebalanceImpl.setmQClientFactory(this.mQClientFactory);
 
+                //构建 PullAPIWrapper 对象，该对象封装了具体拉取消息的逻辑，PULL,PUSH 模式最终都会调用 PullAPIWrapper 类的方法从 Broker 拉取消息
                 this.pullAPIWrapper = new PullAPIWrapper(
                     mQClientFactory,
                     this.defaultMQPullConsumer.getConsumerGroup(), isUnitMode());
                 this.pullAPIWrapper.registerFilterMessageHook(filterMessageHookList);
 
+
+                //根据集群消费模式（广播、集群）初始化消息进度管理器offsetStore
                 if (this.defaultMQPullConsumer.getOffsetStore() != null) {
                     this.offsetStore = this.defaultMQPullConsumer.getOffsetStore();
                 } else {
@@ -622,6 +616,7 @@ public class DefaultMQPullConsumerImpl implements MQConsumerInner {
 
                 this.offsetStore.load();
 
+                //6将该消费者加入到 MQClientInstance 消费者列表中
                 boolean registerOK = mQClientFactory.registerConsumer(this.defaultMQPullConsumer.getConsumerGroup(), this);
                 if (!registerOK) {
                     this.serviceState = ServiceState.CREATE_JUST;
@@ -631,6 +626,7 @@ public class DefaultMQPullConsumerImpl implements MQConsumerInner {
                         null);
                 }
 
+                //启动 MQClientInstance
                 mQClientFactory.start();
                 log.info("the consumer [{}] start OK", this.defaultMQPullConsumer.getConsumerGroup());
                 this.serviceState = ServiceState.RUNNING;

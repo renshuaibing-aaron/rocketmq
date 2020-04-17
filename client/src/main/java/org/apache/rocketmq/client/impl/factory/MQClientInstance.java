@@ -68,6 +68,7 @@ import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 
 /**
  * 封装对 Namesrv，Broker 的 API调用，提供给 Producer、Consumer 使用
+ * 特别注意 这里是公用一个
  */
 public class MQClientInstance {
     private final static long LOCK_TIMEOUT_MILLIS = 3000;
@@ -140,13 +141,14 @@ public class MQClientInstance {
         this.mQAdminImpl = new MQAdminImpl(this);
 
 
-        //初始化PullMessageService服务线程 供DefaultMQPushConsumer端使用的
+        //初始化PullMessageService服务线程 供DefaultMQPushConsumer端使用的 异步发送请求到broker并负责将返回结果放到缓存队列
         this.pullMessageService = new PullMessageService(this);
 
         //初始化RebalanceService服务线程  供Consumser端使用的
         this.rebalanceService = new RebalanceService(this);
 
         //初始化producerGroup等于"CLIENT_INNER_PRODUCER"的DefaultMQProducer对象
+        //这个地方初始化一个自用的生产者 主要用于在消费失败或者超时后发送重试的消息给broker
         this.defaultMQProducer = new DefaultMQProducer(MixAll.CLIENT_INNER_PRODUCER_GROUP);
         this.defaultMQProducer.resetClientConfig(clientConfig);
 
@@ -231,20 +233,30 @@ public class MQClientInstance {
             switch (this.serviceState) {
                 case CREATE_JUST:
                     this.serviceState = ServiceState.START_FAILED;
-                    // If not specified,looking address from name server
 
+                    // 1、如果NameservAddr为空，尝试从http server获取nameserv的地址
+                    // If not specified,looking address from name server   配置中心的情况
                     if (null == this.clientConfig.getNamesrvAddr()) {
                         this.mQClientAPIImpl.fetchNameServerAddr();
                     }
                     // Start request-response channel
+                    // 2、启动MQClientAPIImpl，初始化NettyClient
                     this.mQClientAPIImpl.start();
+
+
                     // Start various schedule tasks
+                    // 3、开启Client的定时任务
                     this.startScheduledTask();
-                    // Start pull service
+
+                    //注意下面这两个线程 其实只有在push模式下有用  在pull模式下无用 为什么要启动 会不会影响结果
+                    // Start pull service  消息拉取线程  开始处理PullRequest
                     this.pullMessageService.start();
-                    // Start rebalance service
+                    // Start rebalance service  消息队列负载线程
                     this.rebalanceService.start();
+
+
                     // Start push service
+                    //6、启动Client内置的producer  consumer预留的producer，发送要求重新的消息
                     this.defaultMQProducer.getDefaultMQProducerImpl().start(false);
                     log.info("the client factory [{}] start OK", this.clientId);
                     this.serviceState = ServiceState.RUNNING;
@@ -261,7 +273,9 @@ public class MQClientInstance {
         }
     }
 
+    //生产者这些个的定时任务
     private void startScheduledTask() {
+        //获取nameserv地址，就是重复的做第1步，这样就可以动态切换nameserv的地址
         if (null == this.clientConfig.getNamesrvAddr()) {
             this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
@@ -276,6 +290,7 @@ public class MQClientInstance {
             }, 1000 * 10, 1000 * 60 * 2, TimeUnit.MILLISECONDS);
         }
 
+        //从nameserv更新topicRouteInfo，对于producer来说topic的路由信息是最重要的
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
@@ -288,6 +303,7 @@ public class MQClientInstance {
             }
         }, 10, this.clientConfig.getPollNameServerInterval(), TimeUnit.MILLISECONDS);
 
+        //将缓存的broker信息和最新的topicRouteInfo做对比，清除已经下线的broker
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
@@ -301,6 +317,8 @@ public class MQClientInstance {
             }
         }, 1000, this.clientConfig.getHeartbeatBrokerInterval(), TimeUnit.MILLISECONDS);
 
+
+        //todo 消费者保存消费进度，广播消息存在本地，集群消息上传到所有的broker
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
@@ -313,6 +331,8 @@ public class MQClientInstance {
             }
         }, 1000 * 10, this.clientConfig.getPersistConsumerOffsetInterval(), TimeUnit.MILLISECONDS);
 
+
+        //todo 消费者对于`PushConsumer`，根据负载调整本地处理消息的线程池corePool大小
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
@@ -963,9 +983,10 @@ public class MQClientInstance {
 
     /**
      * 三个时机会进行消息队列的分配
-     *      ？等待超时，每 20s 调用一次。
-     *      PushConsumer 启动时，调用 rebalanceService#wakeup(...) 触发。
-     *      Broker 通知 Consumer 加入 或 移除时，Consumer 响应通知，调用 rebalanceService#wakeup(...) 触发
+     *      1 定时触发(20sec)做rebalance
+     *      2 PushConsumer 启动时，调用 rebalanceService#wakeup(...) 触发。
+     *      3 Broker 通知 Consumer 加入 或 移除时，Consumer 响应通知，调用 rebalanceService#wakeup(...) 触发
+     *        收到broker的consumer list发生变化通知后需要重新做负载均衡，比如同一个group中新加入了consumer或者有consumer下线
      * 遍历当前 Client 包含的 consumerTable( Consumer集合 )，执行消息队列分配
      */
     public void doRebalance() {

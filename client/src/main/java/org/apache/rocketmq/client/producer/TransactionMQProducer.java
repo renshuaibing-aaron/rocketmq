@@ -5,6 +5,9 @@ import org.apache.rocketmq.client.exception.MQClientException;
 import org.apache.rocketmq.common.message.Message;
 import org.apache.rocketmq.remoting.RPCHook;
 
+/**
+ * 事务消息的生产者
+ */
 public class TransactionMQProducer extends DefaultMQProducer {
     private TransactionCheckListener transactionCheckListener;
     private int checkThreadPoolMinSize = 1;
@@ -28,6 +31,7 @@ public class TransactionMQProducer extends DefaultMQProducer {
 
     @Override
     public void start() throws MQClientException {
+        System.out.println("============【事务消息生产者启动】=====================");
         this.defaultMQProducerImpl.initTransactionEnv();
         super.start();
     }

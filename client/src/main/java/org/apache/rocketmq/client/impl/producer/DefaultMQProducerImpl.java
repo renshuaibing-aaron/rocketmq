@@ -124,6 +124,9 @@ public class DefaultMQProducerImpl implements MQProducerInner {
             checkForbiddenHookList.size());
     }
 
+    /**
+     * 初始化事务生产者环境
+     */
     public void initTransactionEnv() {
         TransactionMQProducer producer = (TransactionMQProducer) this.defaultMQProducer;
         if (producer.getExecutorService() != null) {
@@ -168,11 +171,12 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                     this.defaultMQProducer.changeInstanceNameToPID();
                 }
 
-                //Step2 ：创建MQClient实例  (这个变量名起的？)
+                //Step2 ：创建MQClient实例  (这个变量名起的？) 一个进程只会存在一个MQClientInstance， 设置clientId （IP@PID）
                 this.mqClientInstance = MQClientManager.getInstance().getAndCreateMQClientInstance(this.defaultMQProducer, rpcHook);
 
 
                 //Step3 ：向MQClientlnstance注册，将当前生产者加入到 MQClientlnstance管理中方便后续调用网络请求、进行心跳检测等
+                //保证一个producerName值对应一个Producer
                 boolean registerOK = mqClientInstance.registerProducer(this.defaultMQProducer.getProducerGroup(), this);
 
                 if (!registerOK) {
@@ -546,9 +550,9 @@ public class DefaultMQProducerImpl implements MQProducerInner {
 
         // 校验 Producer 处于运行状态
         this.makeSureStateOK();
-
         // 校验消息格式
         Validators.checkMessage(msg, this.defaultMQProducer);
+
 
         // 调用编号；用于下面打印日志，标记为同一次发送消息
         final long invokeID = random.nextLong();
@@ -579,10 +583,10 @@ public class DefaultMQProducerImpl implements MQProducerInner {
             // 循环调用发送消息，直到成功
             for (; times < timesTotal; times++) {
                 String lastBrokerName = null == mq ? null : mq.getBrokerName();
-                //获取消息队列
+                //4、从所有topic可用queue中选择一个queue
                 MessageQueue mqSelected = this.selectOneMessageQueue(topicPublishInfo, lastBrokerName);
 
-                if (mqSelected != null) {
+                if (mqSelected != null) {//获取Queue成功
                     mq = mqSelected;
                     brokersSent[times] = mq.getBrokerName();
                     try {
@@ -598,14 +602,17 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                         sendResult = this.sendKernelImpl(msg, mq, communicationMode, sendCallback, topicPublishInfo, timeout - costTime);
                         endTimestamp = System.currentTimeMillis();
 
-                        // 更新Broker可用性信息
+                        // 更新Broker可用性信息 更新本次调用时间到MQFaultStrategy中
                         this.updateFaultItem(mq.getBrokerName(), endTimestamp - beginTimestampPrev, false);
 
                         switch (communicationMode) {
+                            //异步和ONEWAY调用后就直接返回了
                             case ASYNC:
                                 return null;
                             case ONEWAY:
                                 return null;
+
+                            //7、如果broker存储失败，判断是否要重试
                             case SYNC:
                                 if (sendResult.getSendStatus() != SendStatus.SEND_OK) {
 
@@ -619,6 +626,8 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                             default:
                                 break;
                         }
+
+                        // 8、调用接口异常，更新状态到MQFaultStrategy中
                     } catch (RemotingException e) {
 
                         // 打印异常，更新Broker可用性信息，更新继续循环
@@ -728,7 +737,8 @@ public class DefaultMQProducerImpl implements MQProducerInner {
     private TopicPublishInfo tryToFindTopicPublishInfo(final String topic) {
 
         System.out.println(("【生产者发消息根据topic获取路由信息】"));
-        // 缓存中获取 Topic发布信息
+        // 缓存中获取 Topic发布信息  这里说明 nameserver短暂宕机 不影响？？  我的理解是 这个缓存时保存在生产者进程里面的 生产者
+        //不停机是可以的
         TopicPublishInfo topicPublishInfo = this.topicPublishInfoTable.get(topic);
 
         // 当无可用的 Topic发布信息时，从Namesrv获取一次
@@ -751,6 +761,20 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         }
     }
 
+    /**
+     * 消息提交
+     * @param msg
+     * @param mq
+     * @param communicationMode
+     * @param sendCallback
+     * @param topicPublishInfo
+     * @param timeout
+     * @return
+     * @throws MQClientException
+     * @throws RemotingException
+     * @throws MQBrokerException
+     * @throws InterruptedException
+     */
     private SendResult sendKernelImpl(final Message msg,
                                       final MessageQueue mq,
                                       final CommunicationMode communicationMode,
@@ -788,7 +812,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                     sysFlag |= MessageSysFlag.COMPRESSED_FLAG;
                     msgBodyCompressed = true;
                 }
-                // 事务
+                // 事务  如果是事务消息
                 final String tranMsg = msg.getProperty(MessageConst.PROPERTY_TRANSACTION_PREPARED);
                 if (tranMsg != null && Boolean.parseBoolean(tranMsg)) {
                     sysFlag |= MessageSysFlag.TRANSACTION_PREPARED_TYPE;
@@ -1239,16 +1263,21 @@ public class DefaultMQProducerImpl implements MQProducerInner {
     public TransactionSendResult sendMessageInTransaction(final Message msg,
                                                           final LocalTransactionExecuter localTransactionExecuter, final Object arg)
         throws MQClientException {
+        System.out.println("===========【发送事务消息】==============");
+        //1、检查TransactionListener是否存在
         TransactionListener transactionListener = getCheckListener();
         if (null == localTransactionExecuter && null == transactionListener) {
             throw new MQClientException("tranExecutor is null", null);
         }
+        //2、消息校验，校验topic和body长度
         Validators.checkMessage(msg, this.defaultMQProducer);
-        // 发送【Half消息】
+        // 发送【Half消息】  设置消息的事务属性,为PREPARED消息
         SendResult sendResult = null;
         MessageAccessor.putProperty(msg, MessageConst.PROPERTY_TRANSACTION_PREPARED, "true");
         MessageAccessor.putProperty(msg, MessageConst.PROPERTY_PRODUCER_GROUP, this.defaultMQProducer.getProducerGroup());
+
         try {
+            //4、发送消息，和发送普通消息调用同一个方法
             sendResult = this.send(msg);
         } catch (Exception e) {
             throw new MQClientException("send message Exception", e);
@@ -1263,15 +1292,18 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                     if (sendResult.getTransactionId() != null) { // 事务编号。目前开源版本暂时没用到，猜想ONS在使用
                         msg.putUserProperty("__transactionId__", sendResult.getTransactionId());
                     }
+
+                    //6、使用客户端生成的唯一id作为事务ID
                     String transactionId = msg.getProperty(MessageConst.PROPERTY_UNIQ_CLIENT_MESSAGE_ID_KEYIDX);
                     if (null != transactionId && !"".equals(transactionId)) {
                         msg.setTransactionId(transactionId);
                     }
-                    if (null != localTransactionExecuter) {
+                    if (null != localTransactionExecuter) { //默认为空
                         // 执行【本地事务】逻辑
                         localTransactionState = localTransactionExecuter.executeLocalTransactionBranch(msg, arg);
                     } else if (transactionListener != null) {
                         log.debug("Used new transaction API");
+                        //7、消息发送成功，调用transactionListener执行本地事务
                         localTransactionState = transactionListener.executeLocalTransaction(msg, arg);
                     }
                     if (null == localTransactionState) {
@@ -1289,17 +1321,19 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                 }
             }
             break;
-            // 发送【Half消息】失败，标记【本地事务】状态为回滚
             case FLUSH_DISK_TIMEOUT:
             case FLUSH_SLAVE_TIMEOUT:
             case SLAVE_NOT_AVAILABLE:
+                // 发送【Half消息】失败，标记【本地事务】状态为回滚
                 localTransactionState = LocalTransactionState.ROLLBACK_MESSAGE;
                 break;
             default:
                 break;
         }
-        // 结束事务：提交消息 COMMIT / ROLLBACK
+
         try {
+            // 结束事务：提交消息 COMMIT / ROLLBACK
+            //这里其实是 事务消息的生产者会根据本地事务的执行情况 发送给broker进行提交还是回滚
             this.endTransaction(sendResult, localTransactionState, localException);
         } catch (Exception e) {
             log.warn("local transaction execute " + localTransactionState + ", but end broker transaction failed", e);
@@ -1317,7 +1351,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
 
     /**
      * 消息发送流程主要的步骤：验证消息、查找路由 、 消息发送 （包含异常处理机制） 。
-     * DEFAULT SYNC -------------------------------------------------------
+     * DEFAULT SYNC ------------------------------------------------------- 默认的情况下
      */
     public SendResult send(Message msg) throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
         System.out.println(("【生产者启动发送同步消息】"));
@@ -1346,10 +1380,14 @@ public class DefaultMQProducerImpl implements MQProducerInner {
             id = MessageDecoder.decodeMessageId(sendResult.getMsgId());
         }
         String transactionId = sendResult.getTransactionId();
+        //1、获取接收prepared消息的Broker地址  (两个broker必须一样)
         final String brokerAddr = this.mqClientInstance.findBrokerAddressInPublish(sendResult.getMessageQueue().getBrokerName());
         EndTransactionRequestHeader requestHeader = new EndTransactionRequestHeader();
+
         requestHeader.setTransactionId(transactionId);
+        //2、消息在commitLog的offset commit/rollback消息需要携带原prepared消息的commitLog offset和queue offset
         requestHeader.setCommitLogOffset(id.getOffset());
+        //3、根据本地执行结果设置提交或回滚
         switch (localTransactionState) {
             case COMMIT_MESSAGE:
                 requestHeader.setCommitOrRollback(MessageSysFlag.TRANSACTION_COMMIT_TYPE);
@@ -1365,9 +1403,15 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         }
 
         requestHeader.setProducerGroup(this.defaultMQProducer.getProducerGroup());
+        //4、设置消息在broker上的queueOffset
         requestHeader.setTranStateTableOffset(sendResult.getQueueOffset());
         requestHeader.setMsgId(sendResult.getMsgId());
         String remark = localException != null ? ("executeLocalTransactionBranch exception: " + localException.toString()) : null;
+        //5、发送结束事务消息RequestCode.END_TRANSACTION，Oneway
+        //todo 这里可以看出 这个时候 生产者提交结束事务请求的到broker只是用的oneway方式
+        // 就是说明生产者不会管broker 接收到或者不到的这个消息 在之前版本出现过
+        // broker 会回查逻辑（记得生产者TransactionListenerImpl 里面的回查逻辑） 来保证
+        // 现在这个没有用了
         this.mqClientInstance.getMQClientAPIImpl().endTransactionOneway(brokerAddr, requestHeader, remark,
             this.defaultMQProducer.getSendMsgTimeout());
     }

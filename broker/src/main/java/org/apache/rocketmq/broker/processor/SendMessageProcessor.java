@@ -55,7 +55,6 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
     @Override
     public RemotingCommand processRequest(ChannelHandlerContext ctx,
                                           RemotingCommand request) throws RemotingCommandException {
-        //System.out.println("===========处理Producer发来的消息===============");
         System.out.println(("【Broker处理生产者发送的消息】"));
         SendMessageContext mqtraceContext;
         switch (request.getCode()) {
@@ -317,7 +316,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
                                         final SendMessageContext sendMessageContext,
                                         final SendMessageRequestHeader requestHeader) throws RemotingCommandException {
 
-
+          //这个地方是 broker接收到生产者发送的消息了 然后下一步准备保存了
         // 初始化响应
         final RemotingCommand response = RemotingCommand.createResponseCommand(SendMessageResponseHeader.class);
         final SendMessageResponseHeader responseHeader = (SendMessageResponseHeader)response.readCustomHeader();
@@ -374,8 +373,9 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
         msgInner.setReconsumeTimes(requestHeader.getReconsumeTimes() == null ? 0 : requestHeader.getReconsumeTimes());
         PutMessageResult putMessageResult = null;
         Map<String, String> oriProps = MessageDecoder.string2messageProperties(requestHeader.getProperties());
-        String traFlag = oriProps.get(MessageConst.PROPERTY_TRANSACTION_PREPARED);
 
+        //这里看看消息的类型 是不是事务消息 如果是事务消息 保存方式不一样
+        String traFlag = oriProps.get(MessageConst.PROPERTY_TRANSACTION_PREPARED);
         // 校验是否不允许发送事务消息
         if (traFlag != null && Boolean.parseBoolean(traFlag)) {
             if (this.brokerController.getBrokerConfig().isRejectTransactionMessage()) {
@@ -385,8 +385,10 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
                         + "] sending transaction message is forbidden");
                 return response;
             }
+            //存储prepare消息
             putMessageResult = this.brokerController.getTransactionalMessageService().prepareMessage(msgInner);
         } else {
+            //8、调用MessageStore接口存储消息
             putMessageResult = this.brokerController.getMessageStore().putMessage(msgInner);
         }
 

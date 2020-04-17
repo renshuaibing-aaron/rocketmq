@@ -77,6 +77,7 @@ public class PushConsumer {
 
     /**
      * 回调方法 在进行push时 当有消息时可以 可以回调这个方法
+     * 上层应用的消息消费回调函数原型
      */
     static class MessageListenerConcurrentlyImpl implements MessageListenerConcurrently {
         @Override

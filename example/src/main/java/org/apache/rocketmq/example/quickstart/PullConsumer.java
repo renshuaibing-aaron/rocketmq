@@ -26,6 +26,8 @@ public class PullConsumer {
         consumer.setInstanceName("consumer");
         consumer.start();
 
+       // consumer.registerMessageQueueListener();
+
         Set<MessageQueue> mqs = consumer.fetchSubscribeMessageQueues("TopicTest");
         for (MessageQueue mq : mqs) {
             System.out.printf("Consume from the queue: %s%n", mq);

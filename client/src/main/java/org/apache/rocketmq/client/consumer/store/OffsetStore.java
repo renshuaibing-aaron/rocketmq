@@ -8,6 +8,7 @@ import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.remoting.exception.RemotingException;
 
 /**
+ * 消息消费进度接口
  * Offset store interface
  */
 public interface OffsetStore {

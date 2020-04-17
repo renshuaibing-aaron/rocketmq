@@ -33,7 +33,8 @@ import org.apache.rocketmq.common.protocol.body.ConsumeMessageDirectlyResult;
 import org.apache.rocketmq.remoting.common.RemotingHelper;
 
 /**
- * 消费消息服务，不断不断不断消费消息，并处理消费结果
+ * 消费消息服务，不断不断不断消费消息，并处理消费结果 真正的消息消费过程
+ * 中间有个线程池 用来消息的消费 这个线程的核心线程数量和最大线程数量都是可以配置的
  */
 public class ConsumeMessageConcurrentlyService implements ConsumeMessageService {
     private static final InternalLogger log = ClientLogger.getLog();
@@ -203,6 +204,11 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
         final MessageQueue messageQueue,
         final boolean dispatchToConsume) {
 
+        //这里是消息消费的最后一步  也就是消息消费阶段 这里是需要明白rocketamq的消费策略 批量消费
+        //一个拉取批量的消息会被切分成若干个消费批量进行消费。ConsumeMessageService会为每个消费批量创建一个ConsumeRequest对象，
+        // 并将该对象指派给线程池内分配一个线程进行消息消费。例如：如果拉取批量值为32，消费批量值为4，一次拉取得到32个消息后，
+        // ConsumeMessageService会分配8个线程进行消息消费，每个线程消费4个消息。消费消息批量值由DefaultMQPushConsumer的
+        // consumeMessageBatchMaxSize成员变量控制，缺省值为1，Consumer可以通过setConsumeMessageBatchMaxSize函数修改其值，最大允许值为1024
         System.out.println("【消费者立即消费消息】");
         final int consumeBatchSize = this.defaultMQPushConsumer.getConsumeMessageBatchMaxSize();
 
@@ -338,6 +344,7 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
         // 移除消费成功消息，并更新最新消费进度  移除消费失败但是发回broker成功的消息 更新消费进度
         long offset = consumeRequest.getProcessQueue().removeMessage(consumeRequest.getMsgs());
         if (offset >= 0 && !consumeRequest.getProcessQueue().isDropped()) {
+            System.out.println("==========【更新消费进度】============");
             this.defaultMQPushConsumerImpl.getOffsetStore().updateOffset(consumeRequest.getMessageQueue(), offset, true);
         }
     }

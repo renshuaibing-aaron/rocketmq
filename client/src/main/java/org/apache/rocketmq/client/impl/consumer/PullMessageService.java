@@ -13,16 +13,17 @@ import org.apache.rocketmq.common.utils.ThreadUtils;
 
 /**
  * 拉取消息服务，不断不断不断从 Broker 拉取消息，并提交消费任务到 ConsumeMessageService
+ * 消息消费拉取线程
  */
 public class PullMessageService extends ServiceThread {
     private final InternalLogger log = ClientLogger.getLog();
-    //拉取消息请求队列
+    //拉取消息请求队列 这里面放的都是拉取任务
     private final LinkedBlockingQueue<PullRequest> pullRequestQueue = new LinkedBlockingQueue<PullRequest>();
 
     //MQClient对象
     private final MQClientInstance mQClientFactory;
     /**
-     * 定时器。用于延迟提交拉取请求
+     * 定时器。用于延迟提交拉取请求  线程池
      */
     private final ScheduledExecutorService scheduledExecutorService = Executors
         .newSingleThreadScheduledExecutor(new ThreadFactory() {
@@ -103,6 +104,12 @@ public class PullMessageService extends ServiceThread {
 
         while (!this.isStopped()) {
             try {
+                //获取拉取任务
+                //PullRequest 是由 RebalanceService 产生，它根据主题消息队列个数和当前消费组内消费者个数进行负载，
+                // 然后产生对应的 PullRequest 对象，再将这些对象放入到 PullMessageService 的 pullRequestQueue队列
+                //其实可以看 pullservice的队列一直都为空
+                //todo 但是这个需要明白的是在实际代码中，Rebalance模块和PullMessageService没有直接关联，
+                //  是通过调用PushConsumer的executePullRequestImmediately接口来初始化消息拉取任务列表的
                 PullRequest pullRequest = this.pullRequestQueue.take();
                 this.pullMessage(pullRequest);
             } catch (InterruptedException ignored) {

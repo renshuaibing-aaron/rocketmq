@@ -461,9 +461,27 @@ public class DefaultMessageStore implements MessageStore {
         return commitLog;
     }
 
+    /**
+     * 1）找到topic+queue对应的ConsumeQueue；
+     * 2）根据PullRequest传入的offset找到MappedFile；
+     * 3）从MappedFile中里面读取指定数量的CQUnit，根据TagCode做下过滤，然后得到过滤后的Commit log的offset；
+     * 4)根据offset从CommitLog中获取消息详情；
+     * 5）根据消息详情再做一次过滤，然后返回结果
+     *
+     * @param group Consumer group that launches this query.
+     * @param topic Topic to query.
+     * @param queueId Queue ID to query.
+     * @param offset Logical offset to start from.
+     * @param maxMsgNums Maximum count of messages to query.
+     * @param messageFilter Message filter used to screen desired messages.
+     * @return
+     */
+    @Override
     public GetMessageResult getMessage(final String group, final String topic, final int queueId, final long offset,
-        final int maxMsgNums,
-        final MessageFilter messageFilter) {
+                                       final int maxMsgNums,
+                                       final MessageFilter messageFilter) {
+
+        System.out.println("=====【拉取消息的核心方法读文件】====="+Thread.currentThread()+topic+topic+offset);
         if (this.shutdown) {
             log.warn("message store has shutdown, so getMessage is forbidden");
             return null;
@@ -593,6 +611,15 @@ public class DefaultMessageStore implements MessageStore {
 
                         nextBeginOffset = offset + (i / ConsumeQueue.CQ_STORE_UNIT_SIZE);
 
+                        /**todo 判断下次消息拉取时  是从主节点 还是从节点
+                         *     这里说明 rocketMq的读写分离的控制不是一般意思
+                         * maxOffsetPy：代表当前主服务器消息存储文件最大偏移量，maxPhyOffsetPulling：此次拉取消息最大偏移量。
+                         * diff：对于PullMessageService线程来说，当前未被拉取到消息消费端的消息长度。
+                         * TOTAL_PHYSICAL_MEMORY_SIZE：RocketMQ所在服务器总内存大小；accessMessageInMemoryMaxRatio：
+                         * 表示RocketMQ所能使用的最大内存比例，超过该内存，消息将被置换出内存；memory表示RocketMQ消息常驻内存的大小，
+                         * 超过该大小，RocketMQ会将旧的消息置换会磁盘。
+                         * 如果diff大于memory,表示当前需要拉取的消息已经超出了常驻内存的大小，表示主服务器繁忙，此时才建议从从服务器拉取。
+                         */
                         long diff = maxOffsetPy - maxPhyOffsetPulling;
                         long memory = (long) (StoreUtil.TOTAL_PHYSICAL_MEMORY_SIZE
                             * (this.messageStoreConfig.getAccessMessageInMemoryMaxRatio() / 100.0));
@@ -1796,7 +1823,12 @@ public class DefaultMessageStore implements MessageStore {
                                     DefaultMessageStore.this.doDispatch(dispatchRequest);
 
                                     if (BrokerRole.SLAVE != DefaultMessageStore.this.getMessageStoreConfig().getBrokerRole()
-                                        && DefaultMessageStore.this.brokerConfig.isLongPollingEnable()) {
+                                        && DefaultMessageStore.this.brokerConfig.isLongPollingEnable())
+                                    {
+                                        //todo 这里是干什么的？PullRequestHoldService的notifyMessageArriving方
+                                        //  提供唤醒服务
+
+                                        System.out.println("============【新消息到达提供唤醒服务】=============");
                                         DefaultMessageStore.this.messageArrivingListener.arriving(dispatchRequest.getTopic(),
                                             dispatchRequest.getQueueId(), dispatchRequest.getConsumeQueueOffset() + 1,
                                             dispatchRequest.getTagsCode(), dispatchRequest.getStoreTimestamp(),

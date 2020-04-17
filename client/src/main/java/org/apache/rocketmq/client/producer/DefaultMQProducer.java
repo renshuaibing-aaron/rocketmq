@@ -49,6 +49,7 @@ public class DefaultMQProducer extends ClientConfig implements MQProducer {
 
     /**
      * Wrapping internal implementations for virtually all methods presented in this class.
+     * 这里的设计模式是门面模式
      */
     protected final transient DefaultMQProducerImpl defaultMQProducerImpl;
 

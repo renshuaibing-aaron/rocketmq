@@ -59,10 +59,18 @@ public class PullAPIWrapper {
         this.unitMode = unitMode;
     }
 
+    /**
+     * 消息消费者线程在收到消息后，会根据主服务器的建议拉取brokerId来更新pullFromWhichNodeTable
+     * @param mq
+     * @param pullResult
+     * @param subscriptionData
+     * @return
+     */
     public PullResult processPullResult(final MessageQueue mq, final PullResult pullResult,
         final SubscriptionData subscriptionData) {
         PullResultExt pullResultExt = (PullResultExt) pullResult;
 
+        //更新缓存
         this.updatePullFromWhichNode(mq, pullResultExt.getSuggestWhichBrokerId());
         if (PullStatus.FOUND == pullResult.getPullStatus()) {
             ByteBuffer byteBuffer = ByteBuffer.wrap(pullResultExt.getMessageBinary());
@@ -168,8 +176,7 @@ public class PullAPIWrapper {
 
         // 获取Broker信息
         FindBrokerResult findBrokerResult =
-            this.mQClientFactory.findBrokerAddressInSubscribe(mq.getBrokerName(),
-                this.recalculatePullFromWhichNode(mq), false);
+            this.mQClientFactory.findBrokerAddressInSubscribe(mq.getBrokerName(),this.recalculatePullFromWhichNode(mq), false);
         if (null == findBrokerResult) {
             this.mQClientFactory.updateTopicRouteInfoFromNameServer(mq.getTopic());
             findBrokerResult =
@@ -225,6 +232,7 @@ public class PullAPIWrapper {
 
     /**
      * 计算消息队列拉取消息对应的Broker编号
+     * 根据brokername获取
      * @param mq  消息队列
      * @return  Broker编号
      */
@@ -234,12 +242,13 @@ public class PullAPIWrapper {
         if (this.isConnectBrokerByUser()) {
             return this.defaultBrokerId;
         }
-        // 若消息队列映射拉取Broker存在，则返回映射Broker编号
+        // 若消息队列映射拉取Broker存在，则返回映射Broker编号  pullFromWhichNodeTable
+        //pullFromWhichNodeTable  这个缓存表是什么？什么时候更新的
         AtomicLong suggest = this.pullFromWhichNodeTable.get(mq);
         if (suggest != null) {
             return suggest.get();
         }
-        // 返回Broker主节点编号
+        // 否则返回Broker主节点编号
         return MixAll.MASTER_ID;
     }
 

@@ -921,7 +921,7 @@ public class BrokerController {
             public void run() {
                 try {
                     //boker端心跳包发送？
-                    System.out.println("boker端心跳包发送");
+                  //  System.out.println("boker端心跳包发送");
                     BrokerController.this.registerBrokerAll(true, false, brokerConfig.isForceRegister());
                 } catch (Throwable e) {
                     log.error("registerBrokerAll Exception", e);

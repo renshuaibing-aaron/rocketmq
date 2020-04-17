@@ -47,6 +47,7 @@ public class MQFaultStrategy {
     }
 
     /**
+     * 这里是生产者的负载均衡
      * 容错策略选择消息队列逻辑。优先获取可用队列，其次选择一个broker获取队列，最差返回任意broker的一个队列
      * @param tpInfo Topic发布信息
      * @param lastBrokerName   brokerName
@@ -56,18 +57,24 @@ public class MQFaultStrategy {
         if (this.sendLatencyFaultEnable) {
             try {
                 // 获取 brokerName=lastBrokerName && 可用的一个消息队列
+                //1、首先获取上次使用的Queue index+1  注意看着方法 这个地方是实现负载均衡里面的轮询的机制
                 int index = tpInfo.getSendWhichQueue().getAndIncrement();
                 for (int i = 0; i < tpInfo.getMessageQueueList().size(); i++) {
                     int pos = Math.abs(index++) % tpInfo.getMessageQueueList().size();
-                    if (pos < 0)
+                    if (pos < 0) {
                         pos = 0;
+                    }
+                    //2、找到index对应的queue
                     MessageQueue mq = tpInfo.getMessageQueueList().get(pos);
+
+                    //3、如果queue对应的broker可用，则使用该broker
                     if (latencyFaultTolerance.isAvailable(mq.getBrokerName())) {
-                        if (null == lastBrokerName || mq.getBrokerName().equals(lastBrokerName))
+                        if (null == lastBrokerName || mq.getBrokerName().equals(lastBrokerName)) {
                             return mq;
+                        }
                     }
                 }
-                // 选择一个相对好的broker，并获得其对应的一个消息队列，不考虑该队列的可用性
+                //4、如果上一步没找个合适的broker，则从所有的broker中选择一个相对合适的，并且broker是可写的。
                 final String notBestBroker = latencyFaultTolerance.pickOneAtLeast();
                 int writeQueueNums = tpInfo.getQueueIdByBroker(notBestBroker);
                 if (writeQueueNums > 0) {
@@ -86,7 +93,7 @@ public class MQFaultStrategy {
             // 选择一个消息队列，不考虑队列的可用性
             return tpInfo.selectOneMessageQueue();
         }
-// 获得 lastBrokerName 对应的一个消息队列，不考虑该队列的可用性
+     // 获得 lastBrokerName 对应的一个消息队列，不考虑该队列的可用性
         return tpInfo.selectOneMessageQueue(lastBrokerName);
     }
 

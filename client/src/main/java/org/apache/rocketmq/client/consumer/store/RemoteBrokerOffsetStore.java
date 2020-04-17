@@ -21,16 +21,21 @@ import org.apache.rocketmq.common.protocol.header.UpdateConsumerOffsetRequestHea
 import org.apache.rocketmq.remoting.exception.RemotingException;
 
 /**
- * Consumer 消费进度管理，负责从 Broker 获取消费进度，同步消费进度到 Broker
+ * Consumer端 消费进度管理，负责从 Broker 获取消费进度，同步消费进度到 Broker
  * 远程消费进度 在集群模式下使用
  * Remote storage implementation
+ *
+ * 注意和ConsumerOffsetManager 这个类进行对比 这两个之间会相互同步
  */
 public class RemoteBrokerOffsetStore implements OffsetStore {
     private final static InternalLogger log = ClientLogger.getLog();
+
+    // MQ客户端实例，该实例被同一个客户端的消费者、生产者共用
     private final MQClientInstance mQClientFactory;
+    // MQ消费组
     private final String groupName;
-    private ConcurrentMap<MessageQueue, AtomicLong> offsetTable =
-        new ConcurrentHashMap<MessageQueue, AtomicLong>();
+    // 消费进度存储（内存中）
+    private ConcurrentMap<MessageQueue, AtomicLong> offsetTable = new ConcurrentHashMap<MessageQueue, AtomicLong>();
 
     public RemoteBrokerOffsetStore(MQClientInstance mQClientFactory, String groupName) {
         this.mQClientFactory = mQClientFactory;
@@ -49,24 +54,33 @@ public class RemoteBrokerOffsetStore implements OffsetStore {
         if (mq != null) {
             AtomicLong offsetOld = this.offsetTable.get(mq);
             if (null == offsetOld) {
+                //如果当前并没有存储该mq的offset,则把传入的offset放入内存中（map)
                 offsetOld = this.offsetTable.putIfAbsent(mq, new AtomicLong(offset));
             }
 
+            //如果offsetOld不为空，这里如果不为空，说明同时对一个MQ消费队列进行消费，并发执行
             if (null != offsetOld) {
                 if (increaseOnly) {
                     MixAll.compareAndIncreaseOnly(offsetOld, offset);
                 } else {
+                    //根据 increaseOnly 更新原先的 offsetOld 的值
                     offsetOld.set(offset);
                 }
             }
         }
     }
 
+    /**
+     * 根据读取来源，读取消费队列的消费进度
+     * @param mq
+     * @param type
+     * @return
+     */
     @Override
     public long readOffset(final MessageQueue mq, final ReadOffsetType type) {
         if (mq != null) {
             switch (type) {
-                case MEMORY_FIRST_THEN_STORE:
+                case MEMORY_FIRST_THEN_STORE:  // 先从内存中读取，如果内存中不存在，再尝试从磁盘中读取
                 case READ_FROM_MEMORY: {
                     AtomicLong offset = this.offsetTable.get(mq);
                     if (offset != null) {
@@ -223,6 +237,17 @@ public class RemoteBrokerOffsetStore implements OffsetStore {
         }
     }
 
+    /**
+     * 根据 mq 的 broker 名称获取 broker 地址，然后发送请求，我们重点关注一下消费进度是保存在 broker 哪个地方：
+     * Broker端的offset管理参照 ConsumerOffsetManager，保存逻辑其实与广播模式差不多，
+     * offset保存的路径：/rocketmq_home/store/config/consumerOffset.json
+     * @param mq
+     * @return
+     * @throws RemotingException
+     * @throws MQBrokerException
+     * @throws InterruptedException
+     * @throws MQClientException
+     */
     private long fetchConsumeOffsetFromBroker(MessageQueue mq) throws RemotingException, MQBrokerException,
         InterruptedException, MQClientException {
         FindBrokerResult findBrokerResult = this.mQClientFactory.findBrokerAddressInAdmin(mq.getBrokerName());

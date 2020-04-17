@@ -23,3 +23,12 @@ https://www.cnblogs.com/qdhxhz/p/11172585.html
 https://blog.csdn.net/prestigeding/article/details/81277067
 
 
+
+3.事务消息的问题
+关于事务消息到底回查不回查的机制？？
+https://blog.csdn.net/prestigeding/article/details/81275892
+https://blog.csdn.net/zzzgd_666/article/details/80882107
+
+https://github.com/YunaiV/Blog/blob/master/RocketMQ/1011-RocketMQ%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90%EF%BC%9A%E4%BA%8B%E5%8A%A1%E6%B6%88%E6%81%AF.md
+
+

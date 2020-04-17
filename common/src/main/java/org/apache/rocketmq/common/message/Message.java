@@ -19,7 +19,9 @@ public class Message implements Serializable {
     private String topic;
     //MessageFlag
     private int flag;
+    //自定义的属性  其实事务消息的标志就是在这个地方 包含了消息的类型和发送的ProducerGroup
     private Map<String, String> properties;
+    // 此处说明RockeMq本身不对消息的格式做限制  序列化有用户自己负责
     private byte[] body;
     private String transactionId;
 

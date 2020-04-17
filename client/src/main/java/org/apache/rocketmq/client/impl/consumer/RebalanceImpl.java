@@ -25,13 +25,19 @@ import org.apache.rocketmq.common.protocol.heartbeat.MessageModel;
 import org.apache.rocketmq.common.protocol.heartbeat.SubscriptionData;
 
 /**
- * Base class for rebalance algorithm
+ * ReblanceService 线程默认每 20s 进行一次消息队列重新负载，判断消息队列是否需要进行重新分布
+ * （如果消费者个数和主题的队列数没有发生改变），则继续保持原样。对于 PULL 模型，如果消费者需要监听某些主题队列发生事件，
+ * 注册消息队列变更事件方法，则 RebalanceService 会将消息队列负载变化事件通知消费者
  */
 public abstract class RebalanceImpl {
     protected static final InternalLogger log = ClientLogger.getLog();
+
     protected final ConcurrentMap<MessageQueue, ProcessQueue> processQueueTable = new ConcurrentHashMap<MessageQueue, ProcessQueue>(64);
+
     protected final ConcurrentMap<String/* topic */, Set<MessageQueue>> topicSubscribeInfoTable =
         new ConcurrentHashMap<String, Set<MessageQueue>>();
+
+    //
     protected final ConcurrentMap<String /* topic */, SubscriptionData> subscriptionInner =
         new ConcurrentHashMap<String, SubscriptionData>();
     protected String consumerGroup;

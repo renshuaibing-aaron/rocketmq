@@ -2,9 +2,15 @@ package org.apache.rocketmq.client.impl.consumer;
 
 import org.apache.rocketmq.common.message.MessageQueue;
 
+/**
+ * Consumer 进行对Broker进行拉取的任务封装
+ */
 public class PullRequest {
     private String consumerGroup;
     private MessageQueue messageQueue;
+    /**
+     * 本地消息缓存队列  每次拉取的时候 用于保存缓存拉取的消息
+     */
     private ProcessQueue processQueue;
     private long nextOffset;
     private boolean lockedFirst = false;

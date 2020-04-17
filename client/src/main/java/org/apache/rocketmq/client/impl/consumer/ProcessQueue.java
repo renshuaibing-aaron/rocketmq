@@ -20,6 +20,7 @@ import org.apache.rocketmq.common.protocol.body.ProcessQueueInfo;
 
 /**
  * 消息处理队列
+ * 注意这个是 Consumer从Broker拉取消息到本地，并保存到本地的消息缓存队列(ProcessQueue)
  * Queue consumption snapshot
  */
 public class ProcessQueue {
@@ -29,6 +30,8 @@ public class ProcessQueue {
     private final static long PULL_MAX_IDLE_TIME = Long.parseLong(System.getProperty("rocketmq.client.pull.pullMaxIdleTime", "120000"));
     private final InternalLogger log = ClientLogger.getLog();
     private final ReadWriteLock lockTreeMap = new ReentrantReadWriteLock();
+
+    //这是什么？？就是缓存的消息 待消费的消息
     private final TreeMap<Long, MessageExt> msgTreeMap = new TreeMap<Long, MessageExt>();
     private final AtomicLong msgCount = new AtomicLong();
     private final AtomicLong msgSize = new AtomicLong();
@@ -152,6 +155,7 @@ public class ProcessQueue {
         return dispatchToConsume;
     }
 
+    //获取最大的消息跨度 ？这个就是指在消息的缓存队列里面最后一个消息和第一消息之间的queueoffset之间的差值
     public long getMaxSpan() {
         try {
             this.lockTreeMap.readLock().lockInterruptibly();
@@ -171,6 +175,11 @@ public class ProcessQueue {
 
     /**
      * 移除消息，并返回第一条消息队列位置
+     * todo msgTreeMap 的类型，TreeMap, 按消息的 offset 升序排序，返回的 result,
+     *  如果 treemap 中不存在任何消息，那就返回该处理队列最大的偏移量+1，如果移除自己本批消息后，
+     *  处理队列中，还存在消息，则返回该处理队列中最小的偏移量，也就是此时返回的偏移量有可能不是消息本身的偏移量，而是处理队列中最小的偏移量
+     *  优点：防止消息丢失（也就是没有消费到）
+     *  缺点：会造成消息重复消费
      * @param msgs
      * @return
      */

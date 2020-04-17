@@ -2,9 +2,17 @@ package org.apache.rocketmq.common.message;
 
 import java.io.Serializable;
 
+/**
+ * 消息队列
+ */
 public class MessageQueue implements Comparable<MessageQueue>, Serializable {
     private static final long serialVersionUID = 6191200464116433425L;
     private String topic;
+    //brokerName
+    /**
+     * rocketMq 根据messageQueue查找broker的唯一依据就是brokerName
+     * 并且同一组broker(M-S)服务器 其BrokerName相同 只是BrokerId不同 主为0 从服务器大于0
+     */
     private String brokerName;
     private int queueId;
 

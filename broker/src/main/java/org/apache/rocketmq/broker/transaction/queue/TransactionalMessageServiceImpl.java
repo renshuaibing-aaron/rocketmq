@@ -25,7 +25,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-
+/**
+ * 我们知道当执行完本地事务后 返回给消息队列一些状态 rollback  commit unkown 当返回unkown是  rocketMq不会提交消息
+ * 会启动这个线程 回查RMQ_SYS_TRANS_HALF_TOPIC主题中的消息，回查消息的事务状态
+ * TransactionalMessageCheckService的检测频率默认1分钟，可通过在broker.conf文件中设置transactionCheckInterval的值来改变默认值，单位为毫秒
+ *
+ * todo  这个地方不理解 这里回查是干什么的？回查的本质 是从文件里面拉取事务消息 然后呢？？
+ */
 public class TransactionalMessageServiceImpl implements TransactionalMessageService {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.TRANSACTION_LOGGER_NAME);
 

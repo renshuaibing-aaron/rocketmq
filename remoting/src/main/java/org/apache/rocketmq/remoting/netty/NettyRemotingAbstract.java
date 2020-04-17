@@ -162,7 +162,7 @@ public abstract class NettyRemotingAbstract {
                     processRequestCommand(ctx, cmd);
                     break;
                 case RESPONSE_COMMAND:
-                    System.out.println("========获取 返回值==========");
+                   // System.out.println("========获取 返回值==========");
                     processResponseCommand(ctx, cmd);
                     break;
                 default:
@@ -300,8 +300,8 @@ public abstract class NettyRemotingAbstract {
                 executeInvokeCallback(responseFuture);
             } else {
                 //同步消息返回值
-                System.out.println("===========NettyRemotingAbstract#processResponseCommand===同步消息返回值==");
-                System.out.println("=====返回值线程============"+Thread.currentThread());
+               // System.out.println("===========NettyRemotingAbstract#processResponseCommand===同步消息返回值==");
+             //   System.out.println("=====返回值线程============"+Thread.currentThread());
                 responseFuture.putResponse(cmd);
                 responseFuture.release();
             }

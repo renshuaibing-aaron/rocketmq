@@ -1,19 +1,3 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package org.apache.rocketmq.broker.transaction.queue;
 
 import org.apache.rocketmq.broker.BrokerController;
@@ -49,6 +33,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * 针对事务消息
+ */
 public class TransactionalMessageBridge {
     private static final InternalLogger LOGGER = InnerLoggerFactory.getLogger(LoggerName.TRANSACTION_LOGGER_NAME);
 
@@ -190,19 +177,32 @@ public class TransactionalMessageBridge {
         return store.putMessage(parseHalfMessageInner(messageInner));
     }
 
+    /**
+     * 在将消息存到MessageStore之前，会将原始的Topic和queueId放入自定义属性中，
+     * 然后将sysFlag设置成非事务消息，topic统一改成RMQ_SYS_TRANS_HALF_TOPIC,queueId设置为0。
+     * 这样所有的Prepared消息都会发到同一个topic的同一个queue下面。而且因为这个topic是系统内置的，
+     * consumer不会订阅这个topic的消息，所以Prepared的消息是不会被Consumer收到的
+     *
+     * @param msgInner
+     * @return
+     */
     private MessageExtBrokerInner parseHalfMessageInner(MessageExtBrokerInner msgInner) {
         MessageAccessor.putProperty(msgInner, MessageConst.PROPERTY_REAL_TOPIC, msgInner.getTopic());
         MessageAccessor.putProperty(msgInner, MessageConst.PROPERTY_REAL_QUEUE_ID,
             String.valueOf(msgInner.getQueueId()));
+        //清除sysFlag中的事务消息状态位
         msgInner.setSysFlag(
             MessageSysFlag.resetTransactionValue(msgInner.getSysFlag(), MessageSysFlag.TRANSACTION_NOT_TYPE));
+        //事务prepare消息放入统一的topic，RMQ_SYS_TRANS_HALF_TOPIC
         msgInner.setTopic(TransactionalMessageUtil.buildHalfTopic());
+        //queueId统一设置成0
         msgInner.setQueueId(0);
         msgInner.setPropertiesString(MessageDecoder.messageProperties2String(msgInner.getProperties()));
         return msgInner;
     }
 
     public boolean putOpMessage(MessageExt messageExt, String opType) {
+        //选择和Prepared消息相同的queueId
         MessageQueue messageQueue = new MessageQueue(messageExt.getTopic(),
             this.brokerController.getBrokerConfig().getBrokerName(), messageExt.getQueueId());
         if (TransactionalMessageUtil.REMOVETAG.equals(opType)) {
@@ -298,6 +298,8 @@ public class TransactionalMessageBridge {
      * @return This method will always return true.
      */
     private boolean addRemoveTagInTransactionOp(MessageExt messageExt, MessageQueue messageQueue) {
+        //message的topic为RMQ_SYS_TRANS_OP_HALF_TOPIC
+        //消息的tags值是d，body中存储的是prepared消息的queueOffset
         Message message = new Message(TransactionalMessageUtil.buildOpTopic(), TransactionalMessageUtil.REMOVETAG,
             String.valueOf(messageExt.getQueueOffset()).getBytes(TransactionalMessageUtil.charset));
         writeOp(message, messageQueue);
