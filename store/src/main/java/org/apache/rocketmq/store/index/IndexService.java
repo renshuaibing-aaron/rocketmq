@@ -1,19 +1,3 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package org.apache.rocketmq.store.index;
 
 import java.io.File;
@@ -154,6 +138,15 @@ public class IndexService {
         }
     }
 
+    /**
+     *
+     * @param topic
+     * @param key
+     * @param maxNum
+     * @param begin
+     * @param end
+     * @return
+     */
     public QueryOffsetResult queryOffset(String topic, String key, int maxNum, long begin, long end) {
         List<Long> phyOffsets = new ArrayList<Long>(maxNum);
 
@@ -163,6 +156,7 @@ public class IndexService {
         try {
             this.readWriteLock.readLock().lock();
             if (!this.indexFileList.isEmpty()) {
+                //1、从最新的index文件开始向前找
                 for (int i = this.indexFileList.size(); i > 0; i--) {
                     IndexFile f = this.indexFileList.get(i - 1);
                     boolean lastFile = i == this.indexFileList.size();
@@ -170,9 +164,9 @@ public class IndexService {
                         indexLastUpdateTimestamp = f.getEndTimestamp();
                         indexLastUpdatePhyoffset = f.getEndPhyOffset();
                     }
-
+                    //2、index文件的时间包含了begin和end的全部或者部分
                     if (f.isTimeMatched(begin, end)) {
-
+                        //3、从文件中读取index中的offset
                         f.selectPhyOffset(phyOffsets, buildKey(topic, key), maxNum, begin, end, lastFile);
                     }
 
@@ -198,6 +192,10 @@ public class IndexService {
         return topic + "#" + key;
     }
 
+    /**
+     * 创建索引文件
+     * @param req
+     */
     public void buildIndex(DispatchRequest req) {
         IndexFile indexFile = retryGetAndCreateIndexFile();
         if (indexFile != null) {

@@ -37,11 +37,13 @@ public class Message implements Serializable {
         this.flag = flag;
         this.body = body;
 
-        if (tags != null && tags.length() > 0)
+        if (tags != null && tags.length() > 0) {
             this.setTags(tags);
+        }
 
-        if (keys != null && keys.length() > 0)
+        if (keys != null && keys.length() > 0) {
             this.setKeys(keys);
+        }
 
         this.setWaitStoreMsgOK(waitStoreMsgOK);
     }

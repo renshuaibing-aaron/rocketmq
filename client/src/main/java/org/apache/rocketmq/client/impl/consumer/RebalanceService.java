@@ -32,6 +32,7 @@ public class RebalanceService extends ServiceThread {
         while (!this.isStopped()) {
             this.waitForRunning(waitInterval);
             //分配当前 Consumer 可消费的消息队列( MessageQueue )
+            System.out.println("=============【测试消息队列分配服务RebalanceService】=================");
             this.mqClientFactory.doRebalance();
         }
 

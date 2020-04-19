@@ -165,8 +165,9 @@ public abstract class RebalanceImpl {
             final String brokerName = entry.getKey();
             final Set<MessageQueue> mqs = entry.getValue();
 
-            if (mqs.isEmpty())
+            if (mqs.isEmpty()) {
                 continue;
+            }
 
             FindBrokerResult findBrokerResult = this.mQClientFactory.findBrokerAddressInSubscribe(brokerName, MixAll.MASTER_ID, true);
             if (findBrokerResult != null) {
@@ -403,6 +404,9 @@ public abstract class RebalanceImpl {
         List<PullRequest> pullRequestList = new ArrayList<PullRequest>();// 拉消息请求数组
         for (MessageQueue mq : mqSet) {
             if (!this.processQueueTable.containsKey(mq)) {
+
+                //这是加入是顺序消息的话 需要加锁？分布式锁？
+                // todo  原因？
                 if (isOrder && !this.lock(mq)) {
                     log.warn("doRebalance, {}, add a new mq failed, {}, because lock failed", consumerGroup, mq);
                     continue;

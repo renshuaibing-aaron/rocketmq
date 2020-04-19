@@ -253,6 +253,19 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
         return response;
     }
 
+    /**
+     * 处理retry消息
+     *  todo  自己的理解 retry消息 一部分是conumer发送的？consumer在消费失败后会调用自己的额生产客户端 发送给broker
+     *    并且此时设置一个延时时间,broker后台有一个定时任务在扫描到重发时间后会调用processor？ 所以要check一下调用的时候consumer还在不在
+     *    消息重发是有次数限制的，默认是16次。这里会检查是否已经超过最大次数，超过的话会把消息的topic设置成并将topic设置成DeadQueue，
+     *    这样后续处理中就会放入死信队列
+     * @param requestHeader
+     * @param response
+     * @param request
+     * @param msg
+     * @param topicConfig
+     * @return
+     */
     private boolean handleRetryAndDLQ(SendMessageRequestHeader requestHeader, RemotingCommand response,
                                       RemotingCommand request,
                                       MessageExt msg, TopicConfig topicConfig) {
@@ -317,8 +330,10 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
                                         final SendMessageRequestHeader requestHeader) throws RemotingCommandException {
 
           //这个地方是 broker接收到生产者发送的消息了 然后下一步准备保存了
+        System.out.println("===========【Broker接收到Producer发来消息准备保存】===============");
         // 初始化响应
         final RemotingCommand response = RemotingCommand.createResponseCommand(SendMessageResponseHeader.class);
+        //构建responseHeader
         final SendMessageResponseHeader responseHeader = (SendMessageResponseHeader)response.readCustomHeader();
 
         response.setOpaque(request.getOpaque());
@@ -332,6 +347,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
         // 如果未开始接收消息，抛出系统异常
         final long startTimstamp = this.brokerController.getBrokerConfig().getStartAcceptSendRequestTimeStamp();
         if (this.brokerController.getMessageStore().now() < startTimstamp) {
+            //判断当前时间broker是否提供服务，不提供则返回code为SYSTEM_ERROR的response
             response.setCode(ResponseCode.SYSTEM_ERROR);
             response.setRemark(String.format("broker unable to service, until %s", UtilAll.timeMillisToHumanString2(startTimstamp)));
             return response;
@@ -339,6 +355,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
 
         // 消息配置(Topic配置）校验
         response.setCode(-1);
+        //检查topic和queue，如果不存在且broker设置中允许自动创建，则自动创建  注意这里有queue 因为producer 在发送的时候 已经指定队列了
         super.msgCheck(ctx, requestHeader, response);
         if (response.getCode() != -1) {
             return response;
@@ -346,19 +363,22 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
 
         final byte[] body = request.getBody();
 
-        // 如果队列小于0，从可用队列随机选择
-        int queueIdInt = requestHeader.getQueueId();
-        TopicConfig topicConfig = this.brokerController.getTopicConfigManager().selectTopicConfig(requestHeader.getTopic());
 
+        int queueIdInt = requestHeader.getQueueId();
+        //获取topic的配置
+        TopicConfig topicConfig = this.brokerController.getTopicConfigManager().selectTopicConfig(requestHeader.getTopic());
+        // 如果队列小于0，从可用队列随机选择
         if (queueIdInt < 0) {
             queueIdInt = Math.abs(this.random.nextInt() % 99999999) % topicConfig.getWriteQueueNums();
         }
 
-        // 创建MessageExtBrokerInner
+        //6、重新封装request中的message成MessageExtBrokerInner
         MessageExtBrokerInner msgInner = new MessageExtBrokerInner();
         msgInner.setTopic(requestHeader.getTopic());
         msgInner.setQueueId(queueIdInt);
 
+        //todo  对于RETRY消息，1)判断是否consumer还存在    //这里不明白 retry的到底是怎么发送的？谁来发送的
+        //        2)如果超过最大重发次数，尝试创建DLQ，并将topic设置成DeadQueue,消息将被存入死信队列
         if (!handleRetryAndDLQ(requestHeader, response, request, msgInner, topicConfig)) {
             return response;
         }
@@ -391,7 +411,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
             //8、调用MessageStore接口存储消息
             putMessageResult = this.brokerController.getMessageStore().putMessage(msgInner);
         }
-
+        //9、根据putResult设置repsonse状态，更新broker统计信息，成功则回复producer，更新context上下文
         return handlePutMessageResult(putMessageResult, response, request, msgInner, responseHeader, sendMessageContext, ctx, queueIdInt);
 
     }

@@ -9,6 +9,10 @@ import org.apache.rocketmq.logging.InternalLoggerFactory;
 import org.apache.rocketmq.store.config.StorePathConfigHelper;
 
 /**
+ * Broker在收到消息后，通过MessageStore将消息存储到commitLog中，
+ * 但是consumer在消费消息的时候是按照topic+queue的维度来拉取消息的。为了方便读取，
+ * MessageStore将CommitLog中消息的offset按照topic+queueId划分后，存储到不同的文件中，这就是ConsumeQueue
+ *
  * 在逻辑上
  * ConsumeQueue : MappedFileQueue : MappedFile = 1 : 1 : N
  * 反应到文件上
@@ -365,12 +369,20 @@ public class ConsumeQueue {
     }
 
     public void putMessagePositionInfoWrapper(DispatchRequest request) {
+        //1、写入重试次数，最多30次
         final int maxRetries = 30;
+        //2、判断CQ是否是可写的
         boolean canWrite = this.defaultMessageStore.getRunningFlags().isCQWriteable();
         for (int i = 0; i < maxRetries && canWrite; i++) {
             long tagsCode = request.getTagsCode();
             if (isExtWriteEnable()) {
+                //3、如果需要写ext文件，则将消息的tagscode写入
                 ConsumeQueueExt.CqExtUnit cqExtUnit = new ConsumeQueueExt.CqExtUnit();
+
+                //注意这里将tagcode和bitMap记录进CQExt文件中，这个是一个过滤的扩展功能，
+                // 采用的bloom过滤器先记录消息的bitMap，
+                // 这样consumer来读取消息时先通过bloom过滤器判断是否有符合过滤条件的消息
+                //
                 cqExtUnit.setFilterBitMap(request.getBitMap());
                 cqExtUnit.setMsgStoreTime(request.getStoreTimestamp());
                 cqExtUnit.setTagsCode(request.getTagsCode());
@@ -383,9 +395,11 @@ public class ConsumeQueue {
                         topic, queueId, request.getCommitLogOffset());
                 }
             }
+            //4、写入文件
             boolean result = this.putMessagePositionInfo(request.getCommitLogOffset(),
                 request.getMsgSize(), tagsCode, request.getConsumeQueueOffset());
             if (result) {
+                //5、记录check point
                 this.defaultMessageStore.getStoreCheckpoint().setLogicsMsgTimestamp(request.getStoreTimestamp());
                 return;
             } else {
@@ -406,13 +420,18 @@ public class ConsumeQueue {
         this.defaultMessageStore.getRunningFlags().makeLogicsQueueError();
     }
 
+    // 写文件的逻辑
+    //写文件的逻辑和写CommitLog的逻辑是一样的，首先封装一个CQUnit，这里面offset占8个字节，
+    // 消息size占用4个字节，tagcode占用8个字节。然后找最后一个MappedFile，对于新建的文件，
+    // 会有一个预热的动作，写把所有CQUnit初始化成0值。最后将Unit写入到文件中
+    //
     private boolean putMessagePositionInfo(final long offset, final int size, final long tagsCode,
         final long cqOffset) {
 
         if (offset <= this.maxPhysicOffset) {
             return true;
         }
-
+        //一个CQUnit的大小是固定的20字节
         this.byteBufferIndex.flip();
         this.byteBufferIndex.limit(CQ_STORE_UNIT_SIZE);
         this.byteBufferIndex.putLong(offset);
@@ -420,10 +439,10 @@ public class ConsumeQueue {
         this.byteBufferIndex.putLong(tagsCode);
 
         final long expectLogicOffset = cqOffset * CQ_STORE_UNIT_SIZE;
-
+        //获取最后一个MappedFile
         MappedFile mappedFile = this.mappedFileQueue.getLastMappedFile(expectLogicOffset);
         if (mappedFile != null) {
-
+            //对新创建的文件，写将所有CQUnit初始化0值
             if (mappedFile.isFirstCreateInQueue() && cqOffset != 0 && mappedFile.getWrotePosition() == 0) {
                 this.minLogicOffset = expectLogicOffset;
                 this.mappedFileQueue.setFlushedWhere(expectLogicOffset);
@@ -454,6 +473,7 @@ public class ConsumeQueue {
                 }
             }
             this.maxPhysicOffset = offset;
+            //CQUnit写入文件中
             return mappedFile.appendMessage(this.byteBufferIndex.array());
         }
         return false;

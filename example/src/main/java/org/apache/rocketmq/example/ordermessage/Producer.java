@@ -1,19 +1,3 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package org.apache.rocketmq.example.ordermessage;
 
 import java.io.UnsupportedEncodingException;
@@ -32,15 +16,20 @@ import org.apache.rocketmq.remoting.exception.RemotingException;
 public class Producer {
     public static void main(String[] args) throws UnsupportedEncodingException {
         try {
+            //1、初始化一个 producer，使用 group name.
             MQProducer producer = new DefaultMQProducer("please_rename_unique_group_name");
+            //2、启动producer
             producer.start();
 
             String[] tags = new String[] {"TagA", "TagB", "TagC", "TagD", "TagE"};
             for (int i = 0; i < 100; i++) {
                 int orderId = i % 10;
+                //3、新建一条消息，指定topic，tag、key和body
                 Message msg =
                     new Message("TopicTestjjj", tags[i % tags.length], "KEY" + i,
                         ("Hello RocketMQ " + i).getBytes(RemotingHelper.DEFAULT_CHARSET));
+
+                //4、提交消息，制定queue选择器和排序参数
                 SendResult sendResult = producer.send(msg, new MessageQueueSelector() {
                     @Override
                     public MessageQueue select(List<MessageQueue> mqs, Message msg, Object arg) {
@@ -52,7 +41,7 @@ public class Producer {
 
                 System.out.printf("%s%n", sendResult);
             }
-
+            //5、关闭Producer
             producer.shutdown();
         } catch (MQClientException | RemotingException | MQBrokerException | InterruptedException e) {
             e.printStackTrace();

@@ -196,24 +196,33 @@ public class MappedFile extends ReferenceResource {
     public AppendMessageResult appendMessagesInner(final MessageExt messageExt, final AppendMessageCallback cb) {
         assert messageExt != null;
         assert cb != null;
-
+        //1、获取当前的write position
         int currentPos = this.wrotePosition.get();
 
         //这个获取写指针 是不是就是文件的名字
         if (currentPos < this.fileSize) {
             //获取需要写入的字节缓冲区
+            // TODO: 2020/4/18
+            //   1 从FileChannel获取直接内存映射，收到消息后，将数据写入到这块内存中，内存和物理文件的数据交互由操作系统负责
+            //   2  CommitLog启动的时候初始化一块内存池(通过ByteBuffer申请的堆外内存)，消息数据首先写入内存池中，
+            //     然后后台有个线程定时将内存池中的数据commit到FileChannel中。这种方式只有MessageStore是ASYNC模式时才能开启。
+            //     代码中if判断writeBuffer不为空的情况就是使用的这种写入方式。
+            //最终回调的Callback类将数据写入buffer中，消息的序列化也是在callback里面完成的
             ByteBuffer byteBuffer = writeBuffer != null ? writeBuffer.slice() : this.mappedByteBuffer.slice();
 
             //设置写入 position，执行写入，更新 wrotePosition(当前写入位置，下次开始写入开始位置)
             byteBuffer.position(currentPos);
             AppendMessageResult result = null;
             if (messageExt instanceof MessageExtBrokerInner) {
+                //3、写单条消息到byteBuffer
                 result = cb.doAppend(this.getFileFromOffset(), byteBuffer, this.fileSize - currentPos, (MessageExtBrokerInner) messageExt);
             } else if (messageExt instanceof MessageExtBatch) {
+                //3、批量消息到byteBuffer
                 result = cb.doAppend(this.getFileFromOffset(), byteBuffer, this.fileSize - currentPos, (MessageExtBatch) messageExt);
             } else {
                 return new AppendMessageResult(AppendMessageStatus.UNKNOWN_ERROR);
             }
+            //4、更新write position，到最新值
             this.wrotePosition.addAndGet(result.getWroteBytes());
             this.storeTimestamp = result.getStoreTimestamp();
             return result;

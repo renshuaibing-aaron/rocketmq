@@ -4,3 +4,7 @@ rocketMQ的消费有两个步骤 第一个是 consumer从broker上拉取消息�
     Consumer从本地的消息缓存队列取出消息，并调用上层应用程序指定的回调函数对消息进行处理。这个步骤中，消费的主体是上层应用程序。
     
 2.
+Consumer启动后会初始化一个RebalanceImpl做rebalance操作，从而得到当前这个consumer负责处理哪些queue的消息。
+RebalanceImpl到broker拉取制定queue的消息，然后把消息按照queueId放到对应的本地的ProcessQueue缓存中
+ConsumeMessageService调用listener处理消息，处理成功后清除掉
+

@@ -300,6 +300,12 @@ public class ProcessQueue {
         }
     }
 
+    /**
+     * todo
+     * 从msgTreeMap中移动指定数量的消息到consumingMsgOrderlyTreeMap中，并返回这部分消息
+     * @param batchSize
+     * @return
+     */
     public List<MessageExt> takeMessags(final int batchSize) {
         List<MessageExt> result = new ArrayList<MessageExt>(batchSize);
         final long now = System.currentTimeMillis();

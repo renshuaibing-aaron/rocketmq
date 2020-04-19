@@ -4,6 +4,8 @@ import java.io.Serializable;
 
 /**
  * 消息队列
+ * todo
+ *   这个怎么理解呢
  */
 public class MessageQueue implements Comparable<MessageQueue>, Serializable {
     private static final long serialVersionUID = 6191200464116433425L;

@@ -1167,7 +1167,8 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         if (topicPublishInfo != null && topicPublishInfo.ok()) {
             MessageQueue mq = null;
             try {
-                System.out.println("=========【选择消息队列】==========");
+                //这里会回调生产者里面匿名内部类的选择方法
+                System.out.println("=========【顺序消息选择消息队列】==========");
                 mq = selector.select(topicPublishInfo.getMessageQueueList(), msg, arg);
             } catch (Throwable e) {
                 throw new MQClientException("select message queue throwed exception.", e);
@@ -1178,7 +1179,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                 throw new RemotingTooMuchRequestException("sendSelectImpl call timeout");
             }
             if (mq != null) {
-                System.out.println("============【发送消息】=============");
+                System.out.println("============【顺序消息发送消息】=============");
                 return this.sendKernelImpl(msg, mq, communicationMode, sendCallback, null, timeout - costTime);
             } else {
                 throw new MQClientException("select message queue return null.", null);

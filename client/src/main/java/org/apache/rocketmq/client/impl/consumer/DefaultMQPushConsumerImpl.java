@@ -667,10 +667,13 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                 this.offsetStore.load();
 
                 // 消息消费服务，顺序和并发消息逻辑不同,接收消息并调用listener消费，处理消费结果
+                // todo 这里可以看出 顺序消息和并发普通消息时不同的  说明如果在同一个进程里面
+                //  如果有需要 最好开启几个消费者
                 if (this.getMessageListenerInner() instanceof MessageListenerOrderly) {
                     this.consumeOrderly = true;
                     this.consumeMessageService =
                         new ConsumeMessageOrderlyService(this, (MessageListenerOrderly) this.getMessageListenerInner());
+
                 } else if (this.getMessageListenerInner() instanceof MessageListenerConcurrently) {
                     this.consumeOrderly = false;
                     this.consumeMessageService =

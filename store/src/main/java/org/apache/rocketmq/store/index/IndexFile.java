@@ -189,6 +189,7 @@ public class IndexFile {
     public void selectPhyOffset(final List<Long> phyOffsets, final String key, final int maxNum,
         final long begin, final long end, boolean lock) {
         if (this.mappedFile.hold()) {
+            //1、跟生成索引时一样，找到key的slot
             int keyHash = indexKeyHashMethod(key);
             int slotPos = keyHash % this.hashSlotNum;
             int absSlotPos = IndexHeader.INDEX_HEADER_SIZE + slotPos * hashSlotSize;
@@ -199,7 +200,7 @@ public class IndexFile {
                     // fileLock = this.fileChannel.lock(absSlotPos,
                     // hashSlotSize, true);
                 }
-
+                //2、获取该槽位上的最后一条索引的序号
                 int slotValue = this.mappedByteBuffer.getInt(absSlotPos);
                 // if (fileLock != null) {
                 // fileLock.release();
@@ -210,18 +211,20 @@ public class IndexFile {
                     || this.indexHeader.getIndexCount() <= 1) {
                 } else {
                     for (int nextIndexToRead = slotValue; ; ) {
-                        if (phyOffsets.size() >= maxNum) {
+                        if (phyOffsets.size() >= maxNum) { //到达最大返回条数
                             break;
                         }
-
+                        //3、找到index的位置
                         int absIndexPos =
                             IndexHeader.INDEX_HEADER_SIZE + this.hashSlotNum * hashSlotSize
                                 + nextIndexToRead * indexSize;
 
                         int keyHashRead = this.mappedByteBuffer.getInt(absIndexPos);
+                        //3、找到index的位置
                         long phyOffsetRead = this.mappedByteBuffer.getLong(absIndexPos + 4);
 
                         long timeDiff = (long) this.mappedByteBuffer.getInt(absIndexPos + 4 + 8);
+                        //5、相同hashcode的前一条消息的序号
                         int prevIndexRead = this.mappedByteBuffer.getInt(absIndexPos + 4 + 8 + 4);
 
                         if (timeDiff < 0) {
@@ -232,7 +235,7 @@ public class IndexFile {
 
                         long timeRead = this.indexHeader.getBeginTimestamp() + timeDiff;
                         boolean timeMatched = (timeRead >= begin) && (timeRead <= end);
-
+                        //6、Hash和time都符合条件，加入返回列表
                         if (keyHash == keyHashRead && timeMatched) {
                             phyOffsets.add(phyOffsetRead);
                         }
@@ -242,7 +245,7 @@ public class IndexFile {
                             || prevIndexRead == nextIndexToRead || timeRead < begin) {
                             break;
                         }
-
+                        //7、前一条不等于0，继续读入前一条
                         nextIndexToRead = prevIndexRead;
                     }
                 }
