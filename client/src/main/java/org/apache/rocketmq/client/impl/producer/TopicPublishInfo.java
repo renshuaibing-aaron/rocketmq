@@ -76,8 +76,9 @@ public class TopicPublishInfo {
     public MessageQueue selectOneMessageQueue() {
         int index = this.sendWhichQueue.getAndIncrement();
         int pos = Math.abs(index) % this.messageQueueList.size();
-        if (pos < 0)
+        if (pos < 0) {
             pos = 0;
+        }
         return this.messageQueueList.get(pos);
     }
 

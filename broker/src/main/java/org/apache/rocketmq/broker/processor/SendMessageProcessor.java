@@ -53,11 +53,11 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
      * @throws RemotingCommandException
      */
     @Override
-    public RemotingCommand processRequest(ChannelHandlerContext ctx,
-                                          RemotingCommand request) throws RemotingCommandException {
-        System.out.println(("【Broker处理生产者发送的消息】"));
+    public RemotingCommand processRequest(ChannelHandlerContext ctx,RemotingCommand request) throws RemotingCommandException {
+        System.out.println(("【Broker处理生产者发送的消息】")+Thread.currentThread());
         SendMessageContext mqtraceContext;
         switch (request.getCode()) {
+            //这个是什么？
             case RequestCode.CONSUMER_SEND_MSG_BACK:
                 return this.consumerSendMsgBack(ctx, request);
 
@@ -67,7 +67,6 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
                 if (requestHeader == null) {
                     return null;
                 }
-
                 // 发送请求Context。在 hook 场景下使用
                 mqtraceContext = buildMsgContext(ctx, requestHeader);
 
@@ -79,10 +78,11 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
 
                 RemotingCommand response;
 
-                // 处理发送消息逻辑
                 if (requestHeader.isBatch()) {
+                    //批量发送消息
                     response = this.sendBatchMessage(ctx, request, mqtraceContext, requestHeader);
                 } else {
+                    //发送消息
                     response = this.sendMessage(ctx, request, mqtraceContext, requestHeader);
                 }
 
@@ -330,14 +330,13 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
                                         final SendMessageRequestHeader requestHeader) throws RemotingCommandException {
 
           //这个地方是 broker接收到生产者发送的消息了 然后下一步准备保存了
-        System.out.println("===========【Broker接收到Producer发来消息准备保存】===============");
+        System.out.println("【Broker接收到Producer发来消息准备保存】");
         // 初始化响应
         final RemotingCommand response = RemotingCommand.createResponseCommand(SendMessageResponseHeader.class);
         //构建responseHeader
         final SendMessageResponseHeader responseHeader = (SendMessageResponseHeader)response.readCustomHeader();
 
         response.setOpaque(request.getOpaque());
-
         response.addExtField(MessageConst.PROPERTY_MSG_REGION, this.brokerController.getBrokerConfig().getRegionId());
         response.addExtField(MessageConst.PROPERTY_TRACE_SWITCH, String.valueOf(this.brokerController.getBrokerConfig().isTraceOn()));
 
@@ -363,7 +362,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
 
         final byte[] body = request.getBody();
 
-
+        //这里我们可以看出 生产者在发送消息的时候 首先指定了broker  还有队列(broker中的哪个消息队列)
         int queueIdInt = requestHeader.getQueueId();
         //获取topic的配置
         TopicConfig topicConfig = this.brokerController.getTopicConfigManager().selectTopicConfig(requestHeader.getTopic());

@@ -5,6 +5,7 @@ import com.google.common.hash.Hashing;
 import java.nio.charset.Charset;
 
 /**
+ * 一个布隆过滤器的简单实现 这里和JDK里面实现的布隆过滤器不同  需要看看  初步看原来还是一样的
  * Simple implement of bloom filter.
  */
 public class BloomFilter {
@@ -100,6 +101,8 @@ public class BloomFilter {
     }
 
     /**
+     * todo
+     *   这里猜想就是放入布隆过滤器的方法
      * Calculate bit positions of {@code str}, then set the related {@code bits} positions to 1.
      */
     public void hashTo(String str, BitsArray bits) {

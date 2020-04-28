@@ -41,7 +41,7 @@ public class Producer {
                 /*
                  * Create a message instance, specifying topic, tag and message body.
                  */
-                Message msg = new Message("20200406topic" /* Topic */,
+                Message msg = new Message("testcounsmersuoyin" /* Topic */,
                     "TagB" /* Tag */,
                     ("你好 RocketMQ,这是一条测试消息 " + i).getBytes(RemotingHelper.DEFAULT_CHARSET) /* Message body */
                 );

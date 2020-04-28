@@ -17,7 +17,11 @@ import java.util.List;
 public class PushConsumer {
 
     public static void main(String[] args) throws InterruptedException, MQClientException {
+        consumerstart();
 
+    }
+
+    private static void consumerstart() throws MQClientException {
         /*
          * Instantiate with specified consumer group name.
          * 消费组
@@ -52,7 +56,7 @@ public class PushConsumer {
          * 订阅的topic
          * 构建Consumer端的订阅数据SubscriptionData对象
          */
-        consumer.subscribe("20200406topic", "*");
+        consumer.subscribe("testcounsmer3", "*");
 
         //注意这里有个坑 当consumer消费者先启动时  不会生效 其实还是一条一条的消费  原因消费者启动了 不断轮训生产者
         //生产者 写数据 还是一条一条写的
@@ -83,7 +87,7 @@ public class PushConsumer {
         @Override
         public ConsumeConcurrentlyStatus consumeMessage(List<MessageExt> msgs, ConsumeConcurrentlyContext context) {
             System.out.println("接受消息的数量是" + msgs.size());
-            // System.out.printf("%s 接收到新消息: %s %n", Thread.currentThread().getName(), msgs);
+             System.out.printf("%s 接收到新消息: %s %n", Thread.currentThread().getName(), msgs);
             return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
         }
     }

@@ -84,7 +84,9 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
      * 消费端消费者与消息队列的重新分布，与消息应该分配给哪个消费者消费息息相关
      */
     private final RebalanceImpl rebalanceImpl = new RebalancePushImpl(this);
+
     private final ArrayList<FilterMessageHook> filterMessageHookList = new ArrayList<FilterMessageHook>();
+
     private final long consumerStartTimestamp = System.currentTimeMillis();
     private final ArrayList<ConsumeMessageHook> consumeMessageHookList = new ArrayList<ConsumeMessageHook>();
     private final RPCHook rpcHook;

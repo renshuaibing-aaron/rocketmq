@@ -84,7 +84,7 @@ public class PullMessageProcessor implements NettyRequestProcessor {
     private RemotingCommand processRequest(final Channel channel, RemotingCommand request, boolean brokerAllowSuspend)
         throws RemotingCommandException {
 
-        System.out.println("==============【broker收到consumer拉取请求开始处理】=================");
+        System.out.println("【broker收到consumer拉取请求,开始处理】");
         RemotingCommand response = RemotingCommand.createResponseCommand(PullMessageResponseHeader.class);
         final PullMessageResponseHeader responseHeader = (PullMessageResponseHeader) response.readCustomHeader();
         final PullMessageRequestHeader requestHeader =
@@ -426,6 +426,7 @@ public class PullMessageProcessor implements NettyRequestProcessor {
                         // 将这次请求的信息包括channel全部封装到PullRequest，并保存到pullRequestTable，即把当前的request hold住
                         PullRequest pullRequest = new PullRequest(request, channel, pollingTimeMills,
                             this.brokerController.getMessageStore().now(), offset, subscriptionData, messageFilter);
+                        //当拉取消息为空的时候 挂起请求
                         this.brokerController.getPullRequestHoldService().suspendPullRequest(topic, queueId, pullRequest);
                         response = null;
                         break;

@@ -14,6 +14,10 @@ import org.apache.rocketmq.common.utils.ThreadUtils;
 /**
  * 拉取消息服务，不断不断不断从 Broker 拉取消息，并提交消费任务到 ConsumeMessageService
  * 消息消费拉取线程
+ * todo  注意 需要明白的是每次都是在pullRequestQueue 这个阻塞队列里面获取请求 然后进行拉取
+ *     之前有一个困惑 这个阻塞队列以为只是在客户端负载的时候进行put  我们知道负载的频率是2秒
+ *     这样是不是太慢了 其实put的时间不只这一个地方 在每次拉取消息后 也会进行put 拉取队列的操作
+ *     当然执行的不是pullRequestQueue.put()  而是executePullRequestImmediately()这个方法
  */
 public class PullMessageService extends ServiceThread {
     private final InternalLogger log = ClientLogger.getLog();

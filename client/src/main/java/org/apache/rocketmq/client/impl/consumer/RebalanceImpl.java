@@ -421,12 +421,14 @@ public abstract class RebalanceImpl {
                         log.info("doRebalance, {}, mq already exists, {}", consumerGroup, mq);
                     } else {
                         log.info("doRebalance, {}, add a new mq, {}", consumerGroup, mq);
+
                         PullRequest pullRequest = new PullRequest();
                         pullRequest.setConsumerGroup(consumerGroup);
                         pullRequest.setNextOffset(nextOffset);
                         pullRequest.setMessageQueue(mq);
                         pullRequest.setProcessQueue(pq);
                         pullRequestList.add(pullRequest);
+
                         changed = true;
                     }
                 } else {
@@ -434,7 +436,6 @@ public abstract class RebalanceImpl {
                 }
             }
         }
-
         this.dispatchPullRequest(pullRequestList);
 
         return changed;

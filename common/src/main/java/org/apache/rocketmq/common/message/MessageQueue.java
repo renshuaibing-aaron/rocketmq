@@ -5,7 +5,7 @@ import java.io.Serializable;
 /**
  * 消息队列
  * todo
- *   这个怎么理解呢
+ *   这个怎么理解呢 这个就是消息队列 可以看到消息队列的是由broker和queueId共同确定的
  */
 public class MessageQueue implements Comparable<MessageQueue>, Serializable {
     private static final long serialVersionUID = 6191200464116433425L;

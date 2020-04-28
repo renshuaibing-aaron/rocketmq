@@ -785,6 +785,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         System.out.println(("【生产者发送消息核心方法-发起网络请求给broker】"));
         long beginStartTime = System.currentTimeMillis();
         //获取broker地址
+        //todo  这里可以看出的是 根据brokername 获取brokerIp地址
         String brokerAddr = this.mqClientInstance.findBrokerAddressInPublish(mq.getBrokerName());
 
         if (null == brokerAddr) {

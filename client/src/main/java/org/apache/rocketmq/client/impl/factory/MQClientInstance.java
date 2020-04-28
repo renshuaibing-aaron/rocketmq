@@ -68,7 +68,9 @@ import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 
 /**
  * 封装对 Namesrv，Broker 的 API调用，提供给 Producer、Consumer 使用
- * 特别注意 这里是公用一个
+ * todo特别注意 这里是公用一个
+ *   这个类的实例 不能说是单例模式 但是根据这个类的构造过程可以知道 在同一个进程里面
+ *   加入consumer或者producer的instanceName一样的话 同一个进程 只有一个
  */
 public class MQClientInstance {
     private final static long LOCK_TIMEOUT_MILLIS = 3000;
@@ -78,7 +80,10 @@ public class MQClientInstance {
     private final String clientId;
     private final long bootTimestamp = System.currentTimeMillis();
     private final ConcurrentMap<String/* group */, MQProducerInner> producerTable = new ConcurrentHashMap<String, MQProducerInner>();
+
+    //消费者类  消费者启动的时候 会进行注册
     private final ConcurrentMap<String/* group */, MQConsumerInner> consumerTable = new ConcurrentHashMap<String, MQConsumerInner>();
+
     private final ConcurrentMap<String/* group */, MQAdminExtInner> adminExtTable = new ConcurrentHashMap<String, MQAdminExtInner>();
     private final NettyClientConfig nettyClientConfig;
     private final MQClientAPIImpl mQClientAPIImpl;
@@ -86,8 +91,12 @@ public class MQClientInstance {
     private final ConcurrentMap<String/* Topic */, TopicRouteData> topicRouteTable = new ConcurrentHashMap<String, TopicRouteData>();
     private final Lock lockNamesrv = new ReentrantLock();
     private final Lock lockHeartbeat = new ReentrantLock();
+
+    //保存的是broker的信息 确切的说是路由信息 可以看出  key是brokername(在集群模式下 同一组的broker name相同 利用id来区分主从)
+    // 其实在以后的代码里面我们可以知道 我们在发送消息的时候 获取路由IP 就是查这个缓存 只不过进行过滤一下 只查找id=0的 具有写权限
     private final ConcurrentMap<String/* Broker Name */, HashMap<Long/* brokerId */, String/* address */>> brokerAddrTable =
         new ConcurrentHashMap<String, HashMap<Long, String>>();
+
     private final ConcurrentMap<String/* Broker Name */, HashMap<String/* address */, Integer>> brokerVersionTable =
         new ConcurrentHashMap<String, HashMap<String, Integer>>();
     private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
@@ -97,8 +106,11 @@ public class MQClientInstance {
         }
     });
     private final ClientRemotingProcessor clientRemotingProcessor;
+
     private final PullMessageService pullMessageService;
+
     private final RebalanceService rebalanceService;
+
     private final DefaultMQProducer defaultMQProducer;
     private final ConsumerStatsManager consumerStatsManager;
     private final AtomicLong sendHeartbeatTimesTotal = new AtomicLong(0);
@@ -987,12 +999,12 @@ public class MQClientInstance {
      *      2 PushConsumer 启动时，调用 rebalanceService#wakeup(...) 触发。
      *      3 Broker 通知 Consumer 加入 或 移除时，Consumer 响应通知，调用 rebalanceService#wakeup(...) 触发
      *        收到broker的consumer list发生变化通知后需要重新做负载均衡，比如同一个group中新加入了consumer或者有consumer下线
-     * 遍历当前 Client 包含的 consumerTable( Consumer集合 )，执行消息队列分配
+     *        遍历当前 Client 包含的 consumerTable( Consumer集合 )，执行消息队列分配
      */
     public void doRebalance() {
 
         //遍历当前 Client 包含的 consumerTable( Consumer集合 )，执行消息队列分配
-        //这里获取的是这个客户端的消费者集合
+        //这里获取的是这个客户端的消费者集合  在消费者启动的时候进行了注册
         Set<Entry<String, MQConsumerInner>> entries = this.consumerTable.entrySet();
 
         for (Map.Entry<String, MQConsumerInner> entry :entries) {
@@ -1134,6 +1146,7 @@ public class MQClientInstance {
     }
 
     public String findBrokerAddrByTopic(final String topic) {
+        System.out.println("=========根据topic查找broker地址============");
         TopicRouteData topicRouteData = this.topicRouteTable.get(topic);
         if (topicRouteData != null) {
             List<BrokerData> brokers = topicRouteData.getBrokerDatas();

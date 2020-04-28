@@ -36,7 +36,7 @@ public class PullRequestHoldService extends ServiceThread {
      * @param pullRequest
      */
     public void suspendPullRequest(final String topic, final int queueId, final PullRequest pullRequest) {
-        System.out.println("============【由于没有拉取到消息broker挂起】=============");
+        System.out.println("【由于没有拉取到消息broker挂起】");
         String key = this.buildKey(topic, queueId);
         ManyPullRequest mpr = this.pullRequestTable.get(key);
         if (null == mpr) {
@@ -121,7 +121,7 @@ public class PullRequestHoldService extends ServiceThread {
     public void notifyMessageArriving(final String topic, final int queueId, final long maxOffset, final Long tagsCode,
         long msgStoreTime, byte[] filterBitMap, Map<String, String> properties) {
 
-        System.out.println("============【新消息到达】=============");
+        System.out.println("【通知新消息到达唤醒挂起的请求】");
         String key = this.buildKey(topic, queueId);
         ManyPullRequest mpr = this.pullRequestTable.get(key);
         if (mpr != null) {

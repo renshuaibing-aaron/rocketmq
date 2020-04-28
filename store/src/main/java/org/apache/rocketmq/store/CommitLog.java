@@ -24,6 +24,7 @@ import org.apache.rocketmq.store.ha.HAService;
 import org.apache.rocketmq.store.schedule.ScheduleMessageService;
 
 /**
+ * todo  仔细看 这几个类的对应关系
  * CommitLog : MappedFileQueue : MappedFile = 1 : 1 : N
  * 注意和文件系统的对应
  * MappedFile ：00000000000000000000、00000000001073741824、00000000002147483648等文件
@@ -523,7 +524,7 @@ public class CommitLog {
      * @return
      */
     public PutMessageResult putMessage(final MessageExtBrokerInner msg) {
-        System.out.println(("【Broker文件存储核心方法】"));
+        System.out.println(("【Broker文件存储核心方法CommitLog#putMessage】"));
         // Set the storage time
         //记录消息存储时间
         msg.setStoreTimestamp(System.currentTimeMillis());
@@ -571,6 +572,8 @@ public class CommitLog {
         MappedFile mappedFile = this.mappedFileQueue.getLastMappedFile();
 
         // 获取写入锁
+        // 因为之前错误的设置 broker配置文件中的sendMessageThreadPoolNums 的值 导致一直都是单线程
+        //现在可以明确的是 多线程保存 这个锁是rocketMq自己实现的
         putMessageLock.lock(); //spin or ReentrantLock ,depending on store config
         try {
             long beginLockTimestamp = this.defaultMessageStore.getSystemClock().now();
@@ -654,6 +657,7 @@ public class CommitLog {
         //  则Master保存消息后，需要将消息同步给slave后才会返回结果。如果ASYNC_MASTER，
         //  这里不会做任何操作，由HAService的后台线程做数据同步
         //
+        System.out.println("========同步handleHA=========");
         handleHA(result, putMessageResult, msg);
 
         return putMessageResult;

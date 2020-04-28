@@ -9,6 +9,7 @@ import org.apache.rocketmq.common.protocol.heartbeat.MessageModel;
 import org.apache.rocketmq.common.protocol.heartbeat.SubscriptionData;
 
 /**
+ * 消费者抽象类
  * Consumer inner interface
  */
 public interface MQConsumerInner {

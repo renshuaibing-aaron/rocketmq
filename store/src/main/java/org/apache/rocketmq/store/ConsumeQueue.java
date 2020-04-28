@@ -427,7 +427,7 @@ public class ConsumeQueue {
     //
     private boolean putMessagePositionInfo(final long offset, final int size, final long tagsCode,
         final long cqOffset) {
-
+        System.out.println("【写消费队列ConsumeQueue文件】");
         if (offset <= this.maxPhysicOffset) {
             return true;
         }
