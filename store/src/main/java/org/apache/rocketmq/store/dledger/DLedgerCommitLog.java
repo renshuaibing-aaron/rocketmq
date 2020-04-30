@@ -347,6 +347,7 @@ public class DLedgerCommitLog extends CommitLog {
 
     @Override
     public PutMessageResult putMessage(final MessageExtBrokerInner msg) {
+        System.out.println("【Dledger保存消息putMessage】");
         // Set the storage time
         msg.setStoreTimestamp(System.currentTimeMillis());
         // Set the message body BODY CRC (consider the most appropriate setting
