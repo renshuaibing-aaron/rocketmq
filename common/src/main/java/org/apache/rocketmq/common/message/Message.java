@@ -17,12 +17,15 @@ public class Message implements Serializable {
      * 扩展属性、消息体
      */
     private String topic;
-    //MessageFlag
+    //MessageFlag  注意这个标签 rocketMq不做处理
     private int flag;
+
     //自定义的属性  其实事务消息的标志就是在这个地方 包含了消息的类型和发送的ProducerGroup
     private Map<String, String> properties;
+
     // 此处说明RockeMq本身不对消息的格式做限制  序列化有用户自己负责
     private byte[] body;
+
     private String transactionId;
 
     public Message() {
@@ -114,10 +117,12 @@ public class Message implements Serializable {
         return this.getProperty(MessageConst.PROPERTY_TAGS);
     }
 
+    //消息Tag 用于消息过滤
     public void setTags(String tags) {
         this.putProperty(MessageConst.PROPERTY_TAGS, tags);
     }
 
+    //message索引键 多个用空格分开 rocketMq可以根据这几个索引键进行快速检索到消息
     public String getKeys() {
         return this.getProperty(MessageConst.PROPERTY_KEYS);
     }

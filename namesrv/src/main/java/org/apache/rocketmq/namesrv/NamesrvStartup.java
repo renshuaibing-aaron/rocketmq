@@ -95,8 +95,9 @@ public class NamesrvStartup
         final NamesrvConfig namesrvConfig = new NamesrvConfig();
         final NettyServerConfig nettyServerConfig = new NettyServerConfig();
 
-        //1 ) -c configFile 通过，c 命令指定配置文件的路径 。
-        //2 ） 使用“ 一 属 性名 属 性值”，例如一 listenPort 9876 。
+        //todo 两种配置方式
+        //1) -c configFile 通过，c 命令指定配置文件的路径 。
+        //2) 使用“ --属 性名 属 性值”，例如-- listenPort 9876 。
         nettyServerConfig.setListenPort(9876);
         if (commandLine.hasOption('c'))
         {

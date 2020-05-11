@@ -4,15 +4,22 @@ import org.apache.rocketmq.common.message.MessageQueue;
 
 /**
  * Consumer 进行对Broker进行拉取的任务封装
+ * todo  这个拉取的类的 什么时候创建的？
+ *    两个地方 一个是rocketMq根据PullRequest拉取任务完成后 又将PullRequest对象放入到队列里面
+ *    第二个地方是在RebalanceImpl中创建
  */
 public class PullRequest {
+    //消费组
     private String consumerGroup;
+    //待拉消息队列
     private MessageQueue messageQueue;
     /**
      * 本地消息缓存队列  每次拉取的时候 用于保存缓存拉取的消息
      */
     private ProcessQueue processQueue;
+    //待拉取的MessageQueue偏移量
     private long nextOffset;
+    //是否被锁定
     private boolean lockedFirst = false;
 
     public boolean isLockedFirst() {

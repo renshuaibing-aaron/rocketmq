@@ -1,19 +1,3 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package org.apache.rocketmq.store;
 
 import com.sun.jna.NativeLong;
@@ -28,11 +12,21 @@ import org.apache.rocketmq.store.config.MessageStoreConfig;
 import org.apache.rocketmq.store.util.LibC;
 import sun.nio.ch.DirectBuffer;
 
+/**
+ * 短暂的存储池
+ *  rocketMq 创建一个储存池 用来存储MappedByteBuffer
+ *  作用
+ *  用来临时存储数据 数据 先写入该内存映射中 然后由commit线程定时 将数据从该内存复制到与目的物理文件对应的内存映射中
+ *  这里提供一种内存锁定 将当前的堆外内存一直锁定再内存中  避免进程内存交换到磁盘
+ */
 public class TransientStorePool {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
 
+    //availableBuffers 个数可以通过broker配置文件进行配置 默认是5个
     private final int poolSize;
+    //每个ByteBuffer的大小 默认为MapedFileSizeCommitLog 表明这个类是为commitlog文件服务的
     private final int fileSize;
+    //ByteBuffer 容器 双端队列
     private final Deque<ByteBuffer> availableBuffers;
     private final MessageStoreConfig storeConfig;
 
@@ -45,13 +39,17 @@ public class TransientStorePool {
 
     /**
      * It's a heavy init method.
+     * 初始化
      */
     public void init() {
+        //创建poolSize 个堆外内存
         for (int i = 0; i < poolSize; i++) {
             ByteBuffer byteBuffer = ByteBuffer.allocateDirect(fileSize);
 
             final long address = ((DirectBuffer) byteBuffer).address();
             Pointer pointer = new Pointer(address);
+            //todo  这里利用INSTANCE 将该批内存进行锁定
+            // 避免被置换到交换区 提高存储性能
             LibC.INSTANCE.mlock(pointer, new NativeLong(fileSize));
 
             availableBuffers.offer(byteBuffer);

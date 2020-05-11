@@ -1,19 +1,3 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package org.apache.rocketmq.store.schedule;
 
 import java.util.HashMap;
@@ -46,23 +30,32 @@ import org.apache.rocketmq.store.config.StorePathConfigHelper;
 public class ScheduleMessageService extends ConfigManager {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
 
+    //定时消息统一主题
     public static final String SCHEDULE_TOPIC = "SCHEDULE_TOPIC_XXXX";
+    //第一次调度时延迟的时间 默认是1s
     private static final long FIRST_DELAY_TIME = 1000L;
+    //每一次延时级别调度一次后 延迟该时间间隔后再发入调度池
     private static final long DELAY_FOR_A_WHILE = 100L;
+    //发送异常后 延迟该时间后再继续参与调度
     private static final long DELAY_FOR_A_PERIOD = 10000L;
 
+    //延迟级别 将1s 5s  10s 30s等字符串解析成delayLevelTable 解析后大概是1:1000  2:5000
     private final ConcurrentMap<Integer /* level */, Long/* delay timeMillis */> delayLevelTable =
         new ConcurrentHashMap<Integer, Long>(32);
 
+    //延迟级别消息消费进度
     private final ConcurrentMap<Integer /* level */, Long/* offset */> offsetTable =
         new ConcurrentHashMap<Integer, Long>(32);
 
-    private final Timer timer = new Timer("ScheduleMessageTimerThread", true);
 
+    private final Timer timer = new Timer("ScheduleMessageTimerThread", true);
+    //默认消息存储器
     private final DefaultMessageStore defaultMessageStore;
 
+    //最大消息延迟级别
     private int maxDelayLevel;
 
+    //构造方法
     public ScheduleMessageService(final DefaultMessageStore defaultMessageStore) {
         this.defaultMessageStore = defaultMessageStore;
     }
@@ -101,6 +94,10 @@ public class ScheduleMessageService extends ConfigManager {
         return storeTimestamp + 1000;
     }
 
+    /**
+     * 1.根据延迟级别 创建对应的定时任务
+     * 2.启动定时任务持久化延迟消息队列进度存储
+     */
     public void start() {
 
         for (Map.Entry<Integer, Long> entry : this.delayLevelTable.entrySet()) {
@@ -142,6 +139,11 @@ public class ScheduleMessageService extends ConfigManager {
         return this.encode(false);
     }
 
+    /**
+     * 这个方法主要完成延迟消息消费队列消息进度的加载 与delayLevelTable数据的构造
+     *  说明 延迟队列消息消费进度默认储存路径为delayOffset.json
+     * @return
+     */
     @Override
     public boolean load() {
         boolean result = super.load();
@@ -179,6 +181,7 @@ public class ScheduleMessageService extends ConfigManager {
         timeUnitTable.put("h", 1000L * 60 * 60);
         timeUnitTable.put("d", 1000L * 60 * 60 * 24);
 
+        //解析getMessageStoreConfiggetMessageDelayLevel定义的延迟级别转换为Map 延迟级别1 2 3等对应的延迟时间
         String levelString = this.defaultMessageStore.getMessageStoreConfig().getMessageDelayLevel();
         try {
             String[] levelArray = levelString.split(" ");

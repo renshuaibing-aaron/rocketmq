@@ -76,6 +76,7 @@ public class Validators {
 
     /**
      * Validate message
+     * 检查消息格式  主题名称  消息体不为空  消息长度不为0 且最大长度不超过4M
      */
     public static void checkMessage(Message msg, DefaultMQProducer defaultMQProducer)
         throws MQClientException {

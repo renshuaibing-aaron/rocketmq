@@ -33,13 +33,18 @@ import org.apache.rocketmq.common.protocol.body.ConsumeMessageDirectlyResult;
 import org.apache.rocketmq.remoting.common.RemotingHelper;
 
 /**
+ * 并发尽心消息配置
  * 消费消息服务，不断不断不断消费消息，并处理消费结果 真正的消息消费过程
  * 中间有个线程池 用来消息的消费 这个线程的核心线程数量和最大线程数量都是可以配置的
  */
 public class ConsumeMessageConcurrentlyService implements ConsumeMessageService {
     private static final InternalLogger log = ClientLogger.getLog();
+    //消息推模式实现类
     private final DefaultMQPushConsumerImpl defaultMQPushConsumerImpl;
+    //消费者对象
     private final DefaultMQPushConsumer defaultMQPushConsumer;
+
+    //并发消息业务事件类
     private final MessageListenerConcurrently messageListener;
 
     //消费线程池队列
@@ -47,10 +52,12 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
 
     //消费线程池
     private final ThreadPoolExecutor consumeExecutor;
+    //消费组
     private final String consumerGroup;
 
-    //定时任务线程池
+    //定时任务线程池  添加消费任务到consumeExecutor延迟调度器
     private final ScheduledExecutorService scheduledExecutorService;
+    //定时删除过期消息线程池
     private final ScheduledExecutorService cleanExpireMsgExecutors;
 
     public ConsumeMessageConcurrentlyService(DefaultMQPushConsumerImpl defaultMQPushConsumerImpl,
@@ -62,6 +69,7 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
         this.consumerGroup = this.defaultMQPushConsumer.getConsumerGroup();
         this.consumeRequestQueue = new LinkedBlockingQueue<Runnable>();
 
+        //注意这个使用的无界队列
         this.consumeExecutor = new ThreadPoolExecutor(
             this.defaultMQPushConsumer.getConsumeThreadMin(),
             this.defaultMQPushConsumer.getConsumeThreadMax(),
@@ -135,6 +143,12 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
         return this.consumeExecutor.getCorePoolSize();
     }
 
+    /**
+     * 直接消息消息 主要用于通过管理命令收到消费消息
+     * @param msg  消息
+     * @param brokerName broker名称
+     * @return
+     */
     @Override
     public ConsumeMessageDirectlyResult consumeMessageDirectly(MessageExt msg, String brokerName) {
         ConsumeMessageDirectlyResult result = new ConsumeMessageDirectlyResult();
@@ -199,10 +213,11 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
      */
     @Override
     public void submitConsumeRequest(
-        final List<MessageExt> msgs,
-        final ProcessQueue processQueue,
-        final MessageQueue messageQueue,
-        final boolean dispatchToConsume) {
+        final List<MessageExt> msgs,  //消息列表 默认一次从服务器最多拉取32条
+        final ProcessQueue processQueue,  //消息处理队列
+        final MessageQueue messageQueue, //消息所属的消息队列
+        final boolean dispatchToConsume)  //是否转发到消费线程池  并发消费时忽略这个参数
+    {
 
         //这里是消息消费的最后一步  也就是消息消费阶段 这里是需要明白rocketamq的消费策略 批量消费
         //一个拉取批量的消息会被切分成若干个消费批量进行消费。ConsumeMessageService会为每个消费批量创建一个ConsumeRequest对象，
@@ -210,6 +225,7 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
         // ConsumeMessageService会分配8个线程进行消息消费，每个线程消费4个消息。消费消息批量值由DefaultMQPushConsumer的
         // consumeMessageBatchMaxSize成员变量控制，缺省值为1，Consumer可以通过setConsumeMessageBatchMaxSize函数修改其值，最大允许值为1024
         System.out.println("【消费者立即消费消息】");
+        //这个是什么 默认值是1
         final int consumeBatchSize = this.defaultMQPushConsumer.getConsumeMessageBatchMaxSize();
 
         if (msgs.size() <= consumeBatchSize) {//如果消息小于批量信息数  直接提交消费请求
@@ -217,6 +233,8 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
             try {
                 this.consumeExecutor.submit(consumeRequest);
             } catch (RejectedExecutionException e) {
+                //这个是一种标准的线程提交方式 但是在这里其实不会出现 因为 这里使用的是无界队列
+                //在提交过程中出现拒绝则延迟5秒再提交
                 this.submitConsumeRequestLater(consumeRequest);
             }
         } else { //提交消息大于批量消息数  进行分拆成多个消费请求
@@ -431,9 +449,14 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
             return processQueue;
         }
 
+        /**
+         * 消息消费
+         */
         @Override
         public void run() {
             // 废弃队列不进行消费
+            //todo 这个什么时候会进行设置true
+            //   在进行消息的重新负载的时候如果该消息队列被分配给消费组内其他消费者后 需要droped设置为true 阻止消费者消费不属于自己的消息队列
             if (this.processQueue.isDropped()) {
                 log.info("the message queue not be able to consume, because it's dropped. group={} {}", ConsumeMessageConcurrentlyService.this.consumerGroup, this.messageQueue);
                 return;

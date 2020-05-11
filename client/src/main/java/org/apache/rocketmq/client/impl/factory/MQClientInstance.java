@@ -68,9 +68,11 @@ import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 
 /**
  * 封装对 Namesrv，Broker 的 API调用，提供给 Producer、Consumer 使用
- * todo特别注意 这里是公用一个
+ * todo 特别注意 这里是公用一个
  *   这个类的实例 不能说是单例模式 但是根据这个类的构造过程可以知道 在同一个进程里面
  *   加入consumer或者producer的instanceName一样的话 同一个进程 只有一个
+ *   原因就是这个MQClientInstance 类封装了RocketMq网络处理API 是消息生产者
+ *   消息消费者与NameServer Broker打交道的网络通道
  */
 public class MQClientInstance {
     private final static long LOCK_TIMEOUT_MILLIS = 3000;
@@ -79,6 +81,8 @@ public class MQClientInstance {
     private final int instanceIndex;
     private final String clientId;
     private final long bootTimestamp = System.currentTimeMillis();
+
+    //生产者类缓存 方便后续进行网络请求 进行心跳检测
     private final ConcurrentMap<String/* group */, MQProducerInner> producerTable = new ConcurrentHashMap<String, MQProducerInner>();
 
     //消费者类  消费者启动的时候 会进行注册
@@ -623,8 +627,14 @@ public class MQClientInstance {
         }
     }
 
-    public boolean updateTopicRouteInfoFromNameServer(final String topic, boolean isDefault,
-        DefaultMQProducer defaultMQProducer) {
+    /**
+     * todo  这个方法是干什么呢？
+     * @param topic
+     * @param isDefault
+     * @param defaultMQProducer
+     * @return
+     */
+    public boolean updateTopicRouteInfoFromNameServer(final String topic, boolean isDefault, DefaultMQProducer defaultMQProducer) {
         try {
             if (this.lockNamesrv.tryLock(LOCK_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
                 try {

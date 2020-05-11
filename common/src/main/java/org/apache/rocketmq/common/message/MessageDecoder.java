@@ -63,6 +63,7 @@ public class MessageDecoder {
         input.put(addr);
         input.putLong(offset);
 
+        //这里注意返回的是字符串类型为了保证可读性
         return UtilAll.bytes2string(input.array());
     }
 

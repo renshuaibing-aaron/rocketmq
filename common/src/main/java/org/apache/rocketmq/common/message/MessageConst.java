@@ -1,28 +1,17 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package org.apache.rocketmq.common.message;
 
 import java.util.HashSet;
 
 public class MessageConst {
+
     public static final String PROPERTY_KEYS = "KEYS";
     public static final String PROPERTY_TAGS = "TAGS";
+    //消息发送时 是否等待消息存储完成后再返回调试
     public static final String PROPERTY_WAIT_STORE_MSG_OK = "WAIT";
+    //消息延迟级别 用于定时消息或者消息重试
     public static final String PROPERTY_DELAY_TIME_LEVEL = "DELAY";
+
+
     public static final String PROPERTY_RETRY_TOPIC = "RETRY_TOPIC";
     public static final String PROPERTY_REAL_TOPIC = "REAL_TOPIC";
     public static final String PROPERTY_REAL_QUEUE_ID = "REAL_QID";

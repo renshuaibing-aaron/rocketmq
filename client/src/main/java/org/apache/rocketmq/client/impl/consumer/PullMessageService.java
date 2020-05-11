@@ -21,7 +21,9 @@ import org.apache.rocketmq.common.utils.ThreadUtils;
  */
 public class PullMessageService extends ServiceThread {
     private final InternalLogger log = ClientLogger.getLog();
+
     //拉取消息请求队列 这里面放的都是拉取任务
+    //两种方式put 提供延迟添加与立即添加方式
     private final LinkedBlockingQueue<PullRequest> pullRequestQueue = new LinkedBlockingQueue<PullRequest>();
 
     //MQClient对象
@@ -93,8 +95,11 @@ public class PullMessageService extends ServiceThread {
      * @param pullRequest
      */
     private void pullMessage(final PullRequest pullRequest) {
+        //根据消费组名 从MQClientInstance 中获取MQConsumerInner
         final MQConsumerInner consumer = this.mQClientFactory.selectConsumer(pullRequest.getConsumerGroup());
         if (consumer != null) {
+            //强制转换为DefaultMQPushConsumerImpl
+            //说明 PullMessageService这个线程只为DefaultMQPushConsumerImpl 服务
             DefaultMQPushConsumerImpl impl = (DefaultMQPushConsumerImpl) consumer;
             impl.pullMessage(pullRequest);
         } else {

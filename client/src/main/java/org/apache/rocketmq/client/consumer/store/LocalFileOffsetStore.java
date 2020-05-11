@@ -22,6 +22,7 @@ import org.apache.rocketmq.remoting.exception.RemotingException;
 /**
  * 本地文件消费进度 在广播模式下使用
  * Local storage implementation
+ *
  */
 public class LocalFileOffsetStore implements OffsetStore {
 

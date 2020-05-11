@@ -14,11 +14,16 @@ import org.apache.rocketmq.remoting.exception.RemotingException;
 public interface OffsetStore {
     /**
      * Load
+     * 从消息进度存储文件加载消息进度到内存
      */
     void load() throws MQClientException;
 
     /**
      * Update the offset,store it in memory
+     * 更新内存中的消息消费进度
+     * 消息消费队列
+     * 消息消费偏移量
+     * true表示offset必须大于内存中的当前消费偏移才更新
      */
     void updateOffset(final MessageQueue mq, final long offset, final boolean increaseOnly);
 

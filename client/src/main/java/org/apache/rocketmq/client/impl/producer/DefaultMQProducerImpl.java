@@ -74,8 +74,10 @@ public class DefaultMQProducerImpl implements MQProducerInner {
     private final InternalLogger log = ClientLogger.getLog();
     private final Random random = new Random();
     private final DefaultMQProducer defaultMQProducer;
+
     private final ConcurrentMap<String/* topic */, TopicPublishInfo> topicPublishInfoTable =
         new ConcurrentHashMap<String, TopicPublishInfo>();
+
     private final ArrayList<SendMessageHook> sendMessageHookList = new ArrayList<SendMessageHook>();
     private final RPCHook rpcHook;
     protected BlockingQueue<Runnable> checkRequestQueue;
@@ -172,6 +174,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                 }
 
                 //Step2 ：创建MQClient实例  (这个变量名起的？) 一个进程只会存在一个MQClientInstance， 设置clientId （IP@PID）
+                //todo 整个JVM进程实例里面只存在一个MQClientManager实例 并且这个实例里面维护一个缓存表
                 this.mqClientInstance = MQClientManager.getInstance().getAndCreateMQClientInstance(this.defaultMQProducer, rpcHook);
 
 
@@ -560,7 +563,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         long beginTimestampPrev = beginTimestampFirst;
         long endTimestamp = beginTimestampFirst;
 
-        //查找topic里面的路由方法
+        // 查找topic里面的路由方法
         TopicPublishInfo topicPublishInfo = this.tryToFindTopicPublishInfo(msg.getTopic());
 
 
@@ -753,6 +756,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
 
             return topicPublishInfo;
         } else {
+            System.out.println("【生产者在获取路由的时候 从nameServer中没有获取到路由信息采用的办法】");
             // 当从 Namesrv 无法获取时，使用 {@link DefaultMQProducer#createTopicKey} 对应的 Topic发布信息。
             // 目的是当 Broker 开启自动创建 Topic开关时，Broker 接收到消息后自动创建Topic
             this.mqClientInstance.updateTopicRouteInfoFromNameServer(topic, true, this.defaultMQProducer);

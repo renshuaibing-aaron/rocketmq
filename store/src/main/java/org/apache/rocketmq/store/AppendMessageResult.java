@@ -1,19 +1,3 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package org.apache.rocketmq.store;
 
 /**
@@ -22,18 +6,24 @@ package org.apache.rocketmq.store;
 public class AppendMessageResult {
     // Return code
     private AppendMessageStatus status;
-    // Where to start writing
+
+    // Where to start writing  消息的物理偏移量
     private long wroteOffset;
     // Write Bytes
     private int wroteBytes;
-    // Message ID
+    // Message ID  消息ID
     private String msgId;
-    // Message storage timestamp
+
+    // Message storage timestamp  消息存储的时间
     private long storeTimestamp;
-    // Consume queue's offset(step by one)
+
+    // Consume queue's offset(step by one) 消息消费队列的逻辑偏移量 类似于数组下标
     private long logicsOffset;
+
+    //？
     private long pagecacheRT = 0;
 
+    //消息的条数 批量发送时 消息的条数
     private int msgNum = 1;
 
     public AppendMessageResult(AppendMessageStatus status) {

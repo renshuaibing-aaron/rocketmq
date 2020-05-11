@@ -142,8 +142,8 @@ public class PullAPIWrapper {
     /**
      * 拉取消息核心方法
      * @param mq 消息队列
-     * @param subExpression 订阅表达式
-     * @param expressionType
+     * @param subExpression 订阅表达式 过滤器表达式
+     * @param expressionType  消息表达式类型 TAG和SQL92
      * @param subVersion 订阅版本号
      * @param offset 拉取队列开始位置
      * @param maxNums 拉取消息数量
@@ -174,9 +174,10 @@ public class PullAPIWrapper {
         final PullCallback pullCallback
     ) throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
 
-        // 获取Broker信息
+        // 获取Broker信息 根据brokerName和BrokerId从MQClientInstance 中获取broker地址
         FindBrokerResult findBrokerResult =
             this.mQClientFactory.findBrokerAddressInSubscribe(mq.getBrokerName(),this.recalculatePullFromWhichNode(mq), false);
+
         if (null == findBrokerResult) {
             this.mQClientFactory.updateTopicRouteInfoFromNameServer(mq.getTopic());
             findBrokerResult =
@@ -214,6 +215,8 @@ public class PullAPIWrapper {
 
             String brokerAddr = findBrokerResult.getBrokerAddr();
             if (PullSysFlag.hasClassFilterFlag(sysFlagInner)) {
+                //如果消息过滤器模式为类过滤器模式 则需要根据主题名称  broker地址找到注册在broker上的FilterServer
+                //从FilterServer 上进行拉取 否则 从broker中拉取
                 brokerAddr = computPullFromWhichFilterServer(mq.getTopic(), brokerAddr);
             }
 

@@ -171,8 +171,13 @@ public class AllocateMappedFileService extends ServiceThread {
                 long beginTime = System.currentTimeMillis();
 
                 MappedFile mappedFile;
+
+                //mappedfile文件初始化 根据isTransientStorePoolEnable 分两种情况
                 if (messageStore.getMessageStoreConfig().isTransientStorePoolEnable()) {
                     try {
+                        //todo isTransientStorePoolEnable 为true 表示内容先存储在堆外内存
+                        // 然后通过commit线程将数据提交到内存映射Buffer中  再通过Flush线程将内存映射Buffer中的数据
+                        // 持久化到磁盘中
                         mappedFile = ServiceLoader.load(MappedFile.class).iterator().next();
                         mappedFile.init(req.getFilePath(), req.getFileSize(), messageStore.getTransientStorePool());
                     } catch (RuntimeException e) {
