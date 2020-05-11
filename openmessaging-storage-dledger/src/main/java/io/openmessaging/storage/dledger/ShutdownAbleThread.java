@@ -64,6 +64,9 @@ public abstract class ShutdownAbleThread extends Thread {
         }
     }
 
+    /**
+     * 线程启动方法
+     */
     @Override
     public void run() {
         while (running.get()) {

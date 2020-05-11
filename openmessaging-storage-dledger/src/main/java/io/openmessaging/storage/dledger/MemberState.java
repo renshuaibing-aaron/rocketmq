@@ -38,8 +38,10 @@ public class MemberState {
     private final String selfId;
     private final String peers;
 
+    //可见初始值是候选者
     private Role role = CANDIDATE;
     private String leaderId;
+    //状态机内部维护的轮次
     private long currTerm = -1;
     private String currVoteFor;
     private long ledgerEndIndex = -1;
@@ -220,8 +222,8 @@ public class MemberState {
 
     public enum Role {
         UNKNOWN,
-        CANDIDATE,
-        LEADER,
-        FOLLOWER;
+        CANDIDATE, //候选者，该状态下的节点会发起投票，尝试选择自己为主节点，选举成功后，不会存在该状态下的节点
+        LEADER,  //领导者，主节点，该状态下，需要定时向从节点发送心跳包，用来传播数据、确保其领导地位
+        FOLLOWER; //从节点，该状态下，会开启定时器，尝试进入到candidate状态，以便发起投票选举，同时一旦收到主节点的心跳包，则重置定时器
     }
 }

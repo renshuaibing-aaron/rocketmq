@@ -52,6 +52,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor implement
     @Override
     public RemotingCommand processRequest(ChannelHandlerContext ctx,
                                           RemotingCommand request) throws RemotingCommandException {
+        System.out.println("【Broker接收到Producer发来消息准备保存】");
         RemotingCommand response = null;
         try {
             response = asyncProcessRequest(ctx, request).get();

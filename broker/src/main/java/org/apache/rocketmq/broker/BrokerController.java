@@ -866,7 +866,7 @@ public class BrokerController {
             this.filterServerManager.start();
         }
 
-        //配置用enableDLegerCommitLog=true
+        //配置不是enableDLegerCommitLog=true的时候 进行HA的处理
         if (!messageStoreConfig.isEnableDLegerCommitLog()) {
             startProcessorByHa(messageStoreConfig.getBrokerRole());
             handleSlaveSynchronize(messageStoreConfig.getBrokerRole());
@@ -1180,7 +1180,10 @@ public class BrokerController {
     }
 
 
-
+    /**
+     * 回调 改变broker的角色的时候 进行向nameserver进行注册
+     * @param role
+     */
     public void changeToMaster(BrokerRole role) {
         if (role == BrokerRole.SLAVE) {
             return;
@@ -1209,6 +1212,7 @@ public class BrokerController {
         messageStoreConfig.setBrokerRole(role);
 
         try {
+            //注意采用这种方式的时候  是怎么注册的
             this.registerBrokerAll(true, true, brokerConfig.isForceRegister());
         } catch (Throwable ignored) {
 

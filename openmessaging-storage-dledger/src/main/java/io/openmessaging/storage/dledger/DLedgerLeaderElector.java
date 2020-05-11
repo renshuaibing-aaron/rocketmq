@@ -58,6 +58,7 @@ public class DLedgerLeaderElector {
     private int minVoteIntervalMs = 300;
     //最大的发送投票的间隔，默认为1000ms
     private int maxVoteIntervalMs = 1000;
+
     //注册的节点状态处理器，通过 addRoleChangeHandler 方法添加
     private List<RoleChangeHandler> roleChangeHandlers = new ArrayList<>();
 
@@ -643,7 +644,7 @@ public class DLedgerLeaderElector {
     }
 
     /**
-     * 在raft协议中，节点的状态默认为follower，DLedger的实现从candidate开始，一开始，集群内的所有节点都会尝试发起投票，
+     * 在raft协议中，节点的状态默认为candidate，DLedger的实现从candidate开始，一开始，集群内的所有节点都会尝试发起投票，
      * 这样第一轮要达成选举几乎不太可能
      * todo
      * The core method of maintainer.
@@ -696,6 +697,9 @@ public class DLedgerLeaderElector {
             super(name, logger);
         }
 
+        /**
+         * 线程的执行体
+         */
         @Override public void doWork() {
             try {
                 //如果该节点参与Leader选举
