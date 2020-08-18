@@ -1,7 +1,5 @@
 package com.aaron.ren;
 
-//import com.alibaba.dubbo.config.annotation.Reference;
-//import com.transaction.repository.IRepositoryService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Service;

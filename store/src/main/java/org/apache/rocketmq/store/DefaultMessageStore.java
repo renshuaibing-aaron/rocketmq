@@ -63,9 +63,11 @@ public class DefaultMessageStore implements MessageStore {
     private final FlushConsumeQueueService flushConsumeQueueService;
 
     //清除CommitLog文件服务
+    //负责清理commitLog的过期文件，如果满足时间(每天凌晨4点)/磁盘空间不足/有人手动删除过(???没看懂) 中的一项，即可删去3天内没有修改记录的commitlog
     private final CleanCommitLogService cleanCommitLogService;
 
     //清除consumeQueue文件服务
+    //清理consumequeue的过期文件，触发条件比较苛刻，一个consumequeue文件最多可以存储30w个消息位置信息，检查最后一个消息的offset(即这个文件中最新的消息)是否小于commitlog的最小offset，如果是则删除。即如果某个文件的消息不满30w，肯定不会被删除
     private final CleanConsumeQueueService cleanConsumeQueueService;
 
     //索引文件实现类
@@ -80,8 +82,10 @@ public class DefaultMessageStore implements MessageStore {
     //文件存储HA机制
     private final HAService haService;
 
+    //负责延时将队列的消息写到真实队列
     private final ScheduleMessageService scheduleMessageService;
 
+    //统计消息写入commitlog耗时，qps等信息
     private final StoreStatsService storeStatsService;
 
     //消息堆内存缓存
@@ -574,12 +578,12 @@ public class DefaultMessageStore implements MessageStore {
                     nextBeginOffset = nextOffsetCorrection(offset, maxOffset);
                 }
             } else {
-                // TODO: 2020/4/19 7 
+                // TODO: 2020/4/19 7
                 SelectMappedBufferResult bufferConsumeQueue = consumeQueue.getIndexBuffer(offset);
                 if (bufferConsumeQueue != null) {
                     try {
                         status = GetMessageStatus.NO_MATCHED_MESSAGE;
-                        // TODO: 2020/4/19 8 
+                        // TODO: 2020/4/19 8
                         long nextPhyFileStartOffset = Long.MIN_VALUE;
                         long maxPhyOffsetPulling = 0;
 
@@ -587,19 +591,19 @@ public class DefaultMessageStore implements MessageStore {
                         final int maxFilterMessageCount = Math.max(16000, maxMsgNums * ConsumeQueue.CQ_STORE_UNIT_SIZE);
                         final boolean diskFallRecorded = this.messageStoreConfig.isDiskFallRecorded();
                         ConsumeQueueExt.CqExtUnit cqExtUnit = new ConsumeQueueExt.CqExtUnit();
-                        for (; i < bufferConsumeQueue.getSize() && i < maxFilterMessageCount; i += ConsumeQueue.CQ_STORE_UNIT_SIZE) {  // TODO: 2020/4/19 9 
+                        for (; i < bufferConsumeQueue.getSize() && i < maxFilterMessageCount; i += ConsumeQueue.CQ_STORE_UNIT_SIZE) {  // TODO: 2020/4/19 9
                             long offsetPy = bufferConsumeQueue.getByteBuffer().getLong();
                             int sizePy = bufferConsumeQueue.getByteBuffer().getInt();
-                            long tagsCode = bufferConsumeQueue.getByteBuffer().getLong(); // TODO: 2020/4/19 10 
+                            long tagsCode = bufferConsumeQueue.getByteBuffer().getLong(); // TODO: 2020/4/19 10
 
-                            maxPhyOffsetPulling = offsetPy;  // TODO: 2020/4/19 11 
+                            maxPhyOffsetPulling = offsetPy;  // TODO: 2020/4/19 11
 
-                            if (nextPhyFileStartOffset != Long.MIN_VALUE) {  // TODO: 2020/4/19 12 
+                            if (nextPhyFileStartOffset != Long.MIN_VALUE) {  // TODO: 2020/4/19 12
                                 if (offsetPy < nextPhyFileStartOffset)
                                     continue;
                             }
 
-                            boolean isInDisk = checkInDiskByCommitOffset(offsetPy, maxOffsetPy); // TODO: 2020/4/19 13 
+                            boolean isInDisk = checkInDiskByCommitOffset(offsetPy, maxOffsetPy); // TODO: 2020/4/19 13
 
                             if (this.isTheBatchFull(sizePy, maxMsgNums, getResult.getBufferTotalSize(), getResult.getMessageCount(),
                                 isInDisk)) {
@@ -628,19 +632,19 @@ public class DefaultMessageStore implements MessageStore {
 
                                 continue;
                             }
-                            // TODO: 2020/4/19 16 
+                            // TODO: 2020/4/19 16
                             SelectMappedBufferResult selectResult = this.commitLog.getMessage(offsetPy, sizePy);
                             if (null == selectResult) {
                                 if (getResult.getBufferTotalSize() == 0) {
                                     status = GetMessageStatus.MESSAGE_WAS_REMOVING;
                                 }
-                                // TODO: 2020/4/19 17 
+                                // TODO: 2020/4/19 17
                                 nextPhyFileStartOffset = this.commitLog.rollNextFile(offsetPy);
                                 continue;
                             }
 
                             if (messageFilter != null
-                                && !messageFilter.isMatchedByCommitLog(selectResult.getByteBuffer().slice(), null)) { // TODO: 2020/4/19 18 
+                                && !messageFilter.isMatchedByCommitLog(selectResult.getByteBuffer().slice(), null)) { // TODO: 2020/4/19 18
                                 if (getResult.getBufferTotalSize() == 0) {
                                     status = GetMessageStatus.NO_MATCHED_MESSAGE;
                                 }
@@ -650,12 +654,12 @@ public class DefaultMessageStore implements MessageStore {
                             }
 
                             this.storeStatsService.getGetMessageTransferedMsgCount().incrementAndGet();
-                            getResult.addMessage(selectResult);  // TODO: 2020/4/19 19 
+                            getResult.addMessage(selectResult);  // TODO: 2020/4/19 19
                             status = GetMessageStatus.FOUND;
                             nextPhyFileStartOffset = Long.MIN_VALUE;
                         }
 
-                        if (diskFallRecorded) {  // TODO: 2020/4/19 20 
+                        if (diskFallRecorded) {  // TODO: 2020/4/19 20
                             long fallBehind = maxOffsetPy - maxPhyOffsetPulling;
                             brokerStatsManager.recordDiskFallBehindSize(group, topic, queueId, fallBehind);
                         }
@@ -666,22 +670,24 @@ public class DefaultMessageStore implements MessageStore {
                          *     这里说明 rocketMq的读写分离的控制不是一般意思
                          * maxOffsetPy：代表当前主服务器消息存储文件最大偏移量，maxPhyOffsetPulling：此次拉取消息最大偏移量。
                          * diff：对于PullMessageService线程来说，当前未被拉取到消息消费端的消息长度。
-                         * TOTAL_PHYSICAL_MEMORY_SIZE：RocketMQ所在服务器总内存大小；accessMessageInMemoryMaxRatio：
-                         * 表示RocketMQ所能使用的最大内存比例，超过该内存，消息将被置换出内存；memory表示RocketMQ消息常驻内存的大小，
-                         * 超过该大小，RocketMQ会将旧的消息置换会磁盘。
+                         *
+                         * TOTAL_PHYSICAL_MEMORY_SIZE：RocketMQ所在服务器总内存大小；
+                         * accessMessageInMemoryMaxRatio：表示RocketMQ所能使用的最大内存比例，超过该内存，消息将被置换出内存；
+                         * memory表示RocketMQ消息常驻内存的大小，超过该大小，RocketMQ会将旧的消息置换会磁盘。
                          * 如果diff大于memory,表示当前需要拉取的消息已经超出了常驻内存的大小，表示主服务器繁忙，此时才建议从从服务器拉取。
                          */
                         long diff = maxOffsetPy - maxPhyOffsetPulling;  // TODO: 2020/4/19 21
-                                
+
                         long memory = (long) (StoreUtil.TOTAL_PHYSICAL_MEMORY_SIZE
                             * (this.messageStoreConfig.getAccessMessageInMemoryMaxRatio() / 100.0));
+                        //设置建议下次拉取的broker的地址
                         getResult.setSuggestPullingFromSlave(diff > memory);
                     } finally {
 
                         bufferConsumeQueue.release();
                     }
                 } else {
-                    status = GetMessageStatus.OFFSET_FOUND_NULL; 
+                    status = GetMessageStatus.OFFSET_FOUND_NULL;
                     nextBeginOffset = nextOffsetCorrection(offset, consumeQueue.rollNextFile(offset));
                     log.warn("consumer request topic: " + topic + "offset: " + offset + " minOffset: " + minOffset + " maxOffset: "
                         + maxOffset + ", but access logic queue failed.");

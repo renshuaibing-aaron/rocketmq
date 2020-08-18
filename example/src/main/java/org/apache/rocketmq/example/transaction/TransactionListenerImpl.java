@@ -20,6 +20,9 @@ public class TransactionListenerImpl implements TransactionListener {
         int value = transactionIndex.getAndIncrement();
         int status = value % 3;
         localTrans.put(msg.getTransactionId(), status);
+
+        //todo 注意 这个为什么要返回UNKNOW
+        //  因为rocketMq的结束事务并不会执行事务的的提交  事务的提交与回滚通过下面的事务消息状态回查时再决定是否提交和回滚
         return LocalTransactionState.UNKNOW;
     }
 

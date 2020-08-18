@@ -11,6 +11,14 @@ import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.logging.InternalLoggerFactory;
 import org.apache.rocketmq.store.MappedFile;
 
+/**
+ * 索引文件
+ * 每个index文件由 header(40byte)，slot table(4byte500w,每个索引消息的位置: hash(topic+key)%500w),index list(20byte200w，存储消息在commitlog的位置信息) 三个部分组成
+ *hash冲突如何解决？因为要写入文件，开链法肯定行不通。rocketmq采取的方式是indexList部分顺序写，同时每个index记录存储了前一个相同hash的index的位置。而最尾部的index节点位置存储在slot table中
+    todo rockeyMQ索引文件的区别
+      index文件中没有存储topic+key的值，因此对给定一个key，查询出来的结果可能包含无效值(其他hash值一样的key),需要client二次过滤，因此client需要尽量确保key是唯一的。
+      client在查询时，给定key，maxNum，如果实际获取的list比较大，会查询不全。但是rocketmq没有提供分页的机制
+ */
 public class IndexFile {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
     private static int hashSlotSize = 4;

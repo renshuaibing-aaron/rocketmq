@@ -90,8 +90,12 @@ public class MQClientInstance {
 
     private final ConcurrentMap<String/* group */, MQAdminExtInner> adminExtTable = new ConcurrentHashMap<String, MQAdminExtInner>();
     private final NettyClientConfig nettyClientConfig;
+
+    //MQClientAPIImpl 负责和namesrv、broker通讯
     private final MQClientAPIImpl mQClientAPIImpl;
+
     private final MQAdminImpl mQAdminImpl;
+
     private final ConcurrentMap<String/* Topic */, TopicRouteData> topicRouteTable = new ConcurrentHashMap<String, TopicRouteData>();
     private final Lock lockNamesrv = new ReentrantLock();
     private final Lock lockHeartbeat = new ReentrantLock();
@@ -103,6 +107,12 @@ public class MQClientInstance {
 
     private final ConcurrentMap<String/* Broker Name */, HashMap<String/* address */, Integer>> brokerVersionTable =
         new ConcurrentHashMap<String, HashMap<String, Integer>>();
+
+    //定时任务MQClientAPIImpl模块配合使用
+    //从nameserver获取broker信息
+    //向broker发送心跳，并清除client中超时broker
+    //consumer通知broker更新消费进度
+    //动态更新本地线程池大小
     private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
         @Override
         public Thread newThread(Runnable r) {
@@ -111,8 +121,17 @@ public class MQClientInstance {
     });
     private final ClientRemotingProcessor clientRemotingProcessor;
 
+    //consumer  独有的线程，负责发起拉取消息的任务。
+    // RebalanceService服务调用抽象方法RebalanceImpl#dispatchPullRequest将新增的broker队列分发出去，
+    // 其中pushconsumer的实现RebalancePushImpl会调用PullMessageService的接口向目标broker发起拉取消息的请求。
+    // concumer从namesrv中获取同组同topic的消费者，每个消费者分配不重复的队列,所以具体使用的时候，
+    // 消费者的数量应该要大于队列的数量是没有意义的。具体实现是rebalanceByTopic#rebalanceByTopic
     private final PullMessageService pullMessageService;
 
+    //consumer  独有的线程每10s执行一次，对于每个消费组的每个topic，从broker获取到consumer同胞，
+    // 然后根据负载算法均摊所有的队列。broker可以控制每个topic队列的多少来完成带权重的消息负载，
+    // producer可以通过指定发送的队列来实现权重生产。consumer如果要实现类似功能，
+    // 可以调用setAllocateMessageQueueStrategy修改rocketmq的负载策略
     private final RebalanceService rebalanceService;
 
     private final DefaultMQProducer defaultMQProducer;
@@ -1079,9 +1098,9 @@ public class MQClientInstance {
 
     /**
      * 获取 Broker 信息(Broker 地址、是否为从节点)
-     * @param brokerName
-     * @param brokerId
-     * @param onlyThisBroker
+     * @param brokerName Broker 名称
+     * @param brokerId BrokerId
+     * @param onlyThisBroker 是否必须返回 brokerId 的 Broker 对应的服务器信息
      * @return
      */
     public FindBrokerResult findBrokerAddressInSubscribe(

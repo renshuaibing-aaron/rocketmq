@@ -596,6 +596,7 @@ public class MessageStoreConfig {
      * @return <tt>true</tt> or <tt>false</tt>
      */
     public boolean isTransientStorePoolEnable() {
+        //只有主Broker、刷盘方式为异步刷盘且transientStorePoolEnable为true才会启用暂存池TransientStorePool
         return transientStorePoolEnable && FlushDiskType.ASYNC_FLUSH == getFlushDiskType()
             && BrokerRole.SLAVE != getBrokerRole();
     }

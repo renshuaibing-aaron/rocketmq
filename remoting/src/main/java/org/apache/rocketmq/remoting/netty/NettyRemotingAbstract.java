@@ -57,6 +57,10 @@ public abstract class NettyRemotingAbstract {
 
     /**
      * This map caches all on-going requests.
+     * 实现消息同步发送的关键
+     * 在发送消息前 其中每条消息都有一个唯一标识opaque  然后再发送一条消息前会进行创建一个ResponseFuture  ResponseFuture 这个对象中间
+     * 维护一个CountDownLatch 为1 并且把这个ResponseFuture 保存到这个responseTable 中  当前进程接收到消息后 先判断是请求还是回复
+     * 如果是回复则清除掉responseTable 中的记录 并且减少CountDownLatch 计数  这时候发送线程的就可以返回了
      */
     protected final ConcurrentMap<Integer /* opaque */, ResponseFuture> responseTable =
         new ConcurrentHashMap<Integer, ResponseFuture>(256);
@@ -437,7 +441,7 @@ public abstract class NettyRemotingAbstract {
                     log.warn("send a request command to channel <" + addr + "> failed.");
                 }
             });
-
+             //阻塞等待中
             RemotingCommand responseCommand = responseFuture.waitResponse(timeoutMillis);
             if (null == responseCommand) {
                 if (responseFuture.isSendRequestOK()) {

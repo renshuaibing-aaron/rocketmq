@@ -642,6 +642,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
 
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, RemotingCommand msg) throws Exception {
+            System.out.println("【通信框架客户端接收到消息】");
             processMessageReceived(ctx, msg);
         }
     }

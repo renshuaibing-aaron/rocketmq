@@ -222,30 +222,57 @@ public class MappedFileQueue {
      * @return
      */
     public MappedFile getLastMappedFile(final long startOffset, boolean needCreate) {
-        long createOffset = -1; // 创建文件开始offset。-1时，不创建
+        // 创建文件开始offset。-1时，不创建
+        long createOffset = -1;
+        //获取最后一个MappedFile
         MappedFile mappedFileLast = getLastMappedFile();
 
         if (mappedFileLast == null) {  // 一个映射文件都不存在
+            //如果为空的话，表示目前新建的MappedFile为此queue中的第一个
+            //MappedFile，createOffset为startOffset，因为createOffset
+            //需要为定义的mappedFileSize（默认1G），所以这里减去
+            //多余的部分(startOffset % this.mappedFileSize)
+            //todo  注意这个计算的是什么呢？
+            // 以this.mappedFileSize 为每个文件大小时，startOffset所在文件的开始offset  其实也就是文件名
             createOffset = startOffset - (startOffset % this.mappedFileSize);
         }
 
         if (mappedFileLast != null && mappedFileLast.isFull()) { // 最后一个文件已满
+            //如果queue中在创建MappedFile时已经有存量的MappedFile，则此次
+            //创建是由于queue最后一个MappedFile已经写满触发的，所以此次创建
+            //的新MappedFile偏移则为最后一个文件偏移+mappedFileSize
             createOffset = mappedFileLast.getFileFromOffset() + this.mappedFileSize;
         }
 
         if (createOffset != -1 && needCreate) { // 创建文件
+            //MappedFile的创建可以进行预创建，在创建一个MappedFile时，会
+            //同时创建下一个MappedFile，这样下次需要新建MappedFile时则
+            //可以直接拿到已经预创建好的MappedFile，提高了写的性能。
+
 
             //计算文件名 fileName[n] = fileName[n - 1] + n * mappedFileSize fileName[0] = startOffset - (startOffset % this.mappedFileSize)
             //以 this.mappedFileSize 为每个文件大小时，startOffset 所在文件的开始offset
             String nextFilePath = this.storePath + File.separator + UtilAll.offset2FileName(createOffset);
+            //预分配的下一个MappedFile对应的文件名
             String nextNextFilePath = this.storePath + File.separator+ UtilAll.offset2FileName(createOffset + this.mappedFileSize);
             MappedFile mappedFile = null;
 
+
+            //allocateMappedFileService不为null，表示启用了预创建功能
+            //此时会同时向allocateMappedFileService提交两个创建任务，
+            //一个为此次需要创建的MappedFile，一个为下次获取MappedFile
+            //预创建的MappedFile，此次需要创建的MappedFile的创建任务
+            //为同步创建，需要等其创建成功返回，而预创建的MappedFile则
+            //为异步创建
             if (this.allocateMappedFileService != null) {
                 mappedFile = this.allocateMappedFileService.putRequestAndReturnMappedFile(nextFilePath,
                     nextNextFilePath, this.mappedFileSize);
             } else {
+                //如果没有启用预创建功能，则直接new一个MappedFile对象进行
+                //创建，没有启用预创建功能的MappedFile创建都是不会使用
+                //TransientStorePool暂存池优化的
                 try {
+                    //这里不会使用池化技术
                     mappedFile = new MappedFile(nextFilePath, this.mappedFileSize);
                 } catch (IOException e) {
                     log.error("create mappedFile exception", e);

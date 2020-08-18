@@ -98,14 +98,21 @@ public class BrokerController {
     private final ConsumerManager consumerManager;
     private final ConsumerFilterManager consumerFilterManager;
     private final ProducerManager producerManager;
+    //用于清理1，2，3中心跳超时的链接
     private final ClientHousekeepingService clientHousekeepingService;
+
+    //拉取消息的事件处理器
     private final PullMessageProcessor pullMessageProcessor;
+
+    //consumer 拉取消息如果还没有消息，则可以阻塞一定的时间直到有新的消息或超时。pullRequestHoldService用于维护这些拉取请求
     private final PullRequestHoldService pullRequestHoldService;
     private final MessageArrivingListener messageArrivingListener;
     private final Broker2Client broker2Client;
     private final SubscriptionGroupManager subscriptionGroupManager;
     private final ConsumerIdsChangeListener consumerIdsChangeListener;
     private final RebalanceLockManager rebalanceLockManager = new RebalanceLockManager();
+
+    //brokerOuterAPI broker的客户端网络接口，维护与namesvr的通讯，每隔30s执行一次registerBroker,用于把自身维护的topic信息发送到所有namesvr，同时这次报文也充当心跳的作用
     private final BrokerOuterAPI brokerOuterAPI;
     private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryImpl(
         "BrokerControllerScheduledThread"));
@@ -117,15 +124,24 @@ public class BrokerController {
     private final BlockingQueue<Runnable> heartbeatThreadPoolQueue;
     private final BlockingQueue<Runnable> consumerManagerThreadPoolQueue;
     private final BlockingQueue<Runnable> endTransactionThreadPoolQueue;
+
+    //定期执行脚本startfsrv.sh，启动Filtersrv服务
     private final FilterServerManager filterServerManager;
     private final BrokerStatsManager brokerStatsManager;
     private final List<SendMessageHook> sendMessageHookList = new ArrayList<SendMessageHook>();
     private final List<ConsumeMessageHook> consumeMessageHookList = new ArrayList<ConsumeMessageHook>();
+
+    //存储模块，可以说是broker的核心
     private MessageStore messageStore;
+
+    //remotingServer 监听10911端口，用于监听comsumer和producer的消息
     private RemotingServer remotingServer;
+    //fastRemotingServer 监听端口10909 fastRemotingServer,端口号由10911-2得到
     private RemotingServer fastRemotingServer;
     private TopicConfigManager topicConfigManager;
+
     private ExecutorService sendMessageExecutor;
+
     private ExecutorService pullMessageExecutor;
     private ExecutorService queryMessageExecutor;
     private ExecutorService adminBrokerExecutor;
@@ -163,6 +179,7 @@ public class BrokerController {
         this.consumerManager = new ConsumerManager(this.consumerIdsChangeListener);
         this.consumerFilterManager = new ConsumerFilterManager(this);
         this.producerManager = new ProducerManager();
+
         this.clientHousekeepingService = new ClientHousekeepingService(this);
         this.broker2Client = new Broker2Client(this);
         this.subscriptionGroupManager = new SubscriptionGroupManager(this);
@@ -603,8 +620,11 @@ public class BrokerController {
 
         /**
          * Default  默认事件处理器
+         * 用于处理remotingServer和fastRemotingServer的处理器
+         * 除却BrokerController#registerProcessor方法中特殊注册的处理器，其他都由adminProcessor处理
          */
         AdminBrokerProcessor adminProcessor = new AdminBrokerProcessor(this);
+
         this.remotingServer.registerDefaultProcessor(adminProcessor, this.adminBrokerExecutor);
         this.fastRemotingServer.registerDefaultProcessor(adminProcessor, this.adminBrokerExecutor);
     }
@@ -838,10 +858,12 @@ public class BrokerController {
         }
 
         //启动Broker的Netty服务端NettyRemotingServer。监听消费者或生产者发起的请求信息并处理
+        //remotingServer 监听10911端口，用于监听comsumer和producer的消息
         if (this.remotingServer != null) {
             this.remotingServer.start();
         }
 
+        //fastRemotingServer 监听端口10909 fastRemotingServer,端口号由10911-2得到
         if (this.fastRemotingServer != null) {
             this.fastRemotingServer.start();
         }
@@ -852,6 +874,7 @@ public class BrokerController {
 
         //启动BrokerOuterAPI中的NettyRemotingClient，即建立与NameServer的链接，
         // 用于自身Broker与其他模块的RPC功能调用；包括获取NameServer的地址、注册Broker、注销Broker、获取Topic配置、获取消息进度信息、获取订阅关系等RPC功能
+       //brokerOuterAPI broker的客户端网络接口，维护与namesvr的通讯，每隔30s执行一次registerBroker,用于把自身维护的topic信息发送到所有namesvr，同时这次报文也充当心跳的作用
         if (this.brokerOuterAPI != null) {
             this.brokerOuterAPI.start();
         }

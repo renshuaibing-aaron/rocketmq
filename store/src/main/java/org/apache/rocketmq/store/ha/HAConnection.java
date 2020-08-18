@@ -12,10 +12,16 @@ import org.apache.rocketmq.logging.InternalLoggerFactory;
 import org.apache.rocketmq.remoting.common.RemotingUtil;
 import org.apache.rocketmq.store.SelectMappedBufferResult;
 
+/**
+ *HA master服务端HA连接对象的封装 与broker从服务器的网络读写实现类
+ */
 public class HAConnection {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
+    //HAService 对象
     private final HAService haService;
+    //网络 socket 通道
     private final SocketChannel socketChannel;
+    //客户端连接地址
     private final String clientAddr;
 
     //写到往 Slave节点 的数据
@@ -24,7 +30,9 @@ public class HAConnection {
     //读来自 Slave节点 的数据
     private ReadSocketService readSocketService;
 
+    //从服务器请求拉取数据的偏移量
     private volatile long slaveRequestOffset = -1;
+    //从服务器反馈已拉取完成的数据偏移量
     private volatile long slaveAckOffset = -1;
 
     public HAConnection(final HAService haService, final SocketChannel socketChannel) throws IOException {

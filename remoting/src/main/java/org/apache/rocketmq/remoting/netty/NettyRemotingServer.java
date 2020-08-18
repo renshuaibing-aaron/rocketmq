@@ -1,19 +1,3 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package org.apache.rocketmq.remoting.netty;
 
 import io.netty.bootstrap.ServerBootstrap;
@@ -70,15 +54,31 @@ import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 public class NettyRemotingServer extends NettyRemotingAbstract implements RemotingServer {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(RemotingHelper.ROCKETMQ_REMOTING);
     private final ServerBootstrap serverBootstrap;
-    private final EventLoopGroup eventLoopGroupSelector;
+
+
+    //一个 Reactor 主线程（eventLoopGroupBoss，默认1）负责监听 TCP网络连接请求
+    //建立好连接后丢给Reactor 线程池（eventLoopGroupSelector，源码中默认设置为3）
     private final EventLoopGroup eventLoopGroupBoss;
+
+    //负责将建立好连接的socket 注册到 selector上去（RocketMQ的源码中会自动根据OS的类型选择NIO和Epoll，也可以通过参数配置），然后监听真正的网络数据
+    //拿到网络数据后，再丢给Worker线程池
+    private final EventLoopGroup eventLoopGroupSelector;
+
+    //Worker线程池（defaultEventExecutorGroup，源码中默认设置为8）
+    //为了更为高效的处理RPC的网络请求，这里的Worker线程池是专门用于处理Netty网络通信相关的
+    // （包括编码/解码、空闲链接管理、网络连接管理以及网络请求处理）
+    //注意 业务处理并不是放在这里 业务处理放在业务线程池中(sendMessageExecutor)
+    private DefaultEventExecutorGroup defaultEventExecutorGroup;
+
+
     private final NettyServerConfig nettyServerConfig;
 
     private final ExecutorService publicExecutor;
     private final ChannelEventListener channelEventListener;
 
     private final Timer timer = new Timer("ServerHouseKeepingService", true);
-    private DefaultEventExecutorGroup defaultEventExecutorGroup;
+
+
 
 
     private int port = 0;
@@ -422,6 +422,7 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, RemotingCommand msg) throws Exception {
             //获取消息
+            System.out.println("【通信框架服务端接收到消息】");
             processMessageReceived(ctx, msg);
         }
     }

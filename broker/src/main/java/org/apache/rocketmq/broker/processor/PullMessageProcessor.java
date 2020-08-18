@@ -412,7 +412,7 @@ public class PullMessageProcessor implements NettyRequestProcessor {
                     }
                     break;
                 case ResponseCode.PULL_NOT_FOUND:
-                    //16.4 没有读取到消息，则hold住请求，有新消息时唤醒。等待超时后还是没读到brokerAllowSuspend=false
+                    //todo 16.4 没有读取到消息，则hold住请求，有新消息时唤醒。等待超时后还是没读到brokerAllowSuspend=false
                     if (brokerAllowSuspend && hasSuspendFlag) {
                         // 如果broker开启了长轮询，则将长轮询时间设置为30s(消费者传过来的，默认30s)，否则设置为1s
                         long pollingTimeMills = suspendTimeoutMillisLong;

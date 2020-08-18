@@ -618,6 +618,7 @@ public class CommitLog {
             //todo 这里的mappedFile 对应的是一个个的文件吗？ 猜想是的
             System.out.println("=======获取mappedFile==============="+mappedFile);
             System.out.println("=======获取mappedFile=====个数=========="+mappedFileQueue.getMappedFileSize());
+
             //判断如果mappedFile如果为空或者已满,创建新的mappedFile文件
             if (null == mappedFile || mappedFile.isFull()) {
                 mappedFile = this.mappedFileQueue.getLastMappedFile(0); // Mark: NewFile may be cause noise
@@ -993,7 +994,7 @@ public class CommitLog {
     }
 
     /**
-     * 异步刷盘时使用
+     * 异步刷盘时使用 异步刷盘 && 开启内存字节缓冲区
      */
     class CommitRealTimeService extends FlushCommitLogService {
 
@@ -1377,6 +1378,7 @@ public class CommitLog {
             // STORETIMESTAMP + STOREHOSTADDRESS + OFFSET <br>
 
             // PHY OFFSET 计算物理位置 在 CommitLog 的顺序存储位置
+            //这里猜测是 wroteOffset 是文件名字（也是这个文件的offset）+当前这个文件的写指针
             long wroteOffset = fileFromOffset + byteBuffer.position();
 
             // 计算commitLog里的msgId 重置host holder buffer
@@ -1401,7 +1403,7 @@ public class CommitLog {
 
             if (null == queueOffset) {
                 queueOffset = 0L;
-                //5、如果是这个queue的第一条消息，需要初始化
+                //5、如果是这个queue的第一条消息，需要初始化  一条一条的增加
                 CommitLog.this.topicQueueTable.put(key, queueOffset);
             }
 
@@ -1423,10 +1425,6 @@ public class CommitLog {
                     break;
             }
 
-            /**
-             * Serialize message
-             * 计算消息长度
-             */
             final byte[] propertiesData =
                 msgInner.getPropertiesString() == null ? null : msgInner.getPropertiesString().getBytes(MessageDecoder.CHARSET_UTF8);
 
@@ -1467,8 +1465,13 @@ public class CommitLog {
                 // Here the length of the specially set maxBlank
                 final long beginTimeMills = CommitLog.this.defaultMessageStore.now();
                 byteBuffer.put(this.msgStoreItemMemory.array(), 0, maxBlank);
-                return new AppendMessageResult(AppendMessageStatus.END_OF_FILE, wroteOffset, maxBlank, msgId, msgInner.getStoreTimestamp(),
-                    queueOffset, CommitLog.this.defaultMessageStore.now() - beginTimeMills);
+                return new AppendMessageResult(AppendMessageStatus.END_OF_FILE,
+                        wroteOffset,
+                        maxBlank,
+                        msgId,
+                        msgInner.getStoreTimestamp(),
+                      queueOffset,
+                        CommitLog.this.defaultMessageStore.now() - beginTimeMills);
             }
 
             // Initialization of storage space
@@ -1535,7 +1538,7 @@ public class CommitLog {
                 case MessageSysFlag.TRANSACTION_NOT_TYPE:
                 case MessageSysFlag.TRANSACTION_COMMIT_TYPE:
                     // The next update ConsumeQueue information
-                    //更新消息队列的逻辑偏移量
+                    //更新消息队列的逻辑偏移量   看这里会进行自增+1 肯定不是物理的指针  其实就是消息队列中的消息的个数
                     CommitLog.this.topicQueueTable.put(key, ++queueOffset);
                     break;
                 default:

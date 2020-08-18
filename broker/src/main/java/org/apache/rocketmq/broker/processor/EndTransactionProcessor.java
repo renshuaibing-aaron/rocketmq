@@ -110,6 +110,8 @@ public class EndTransactionProcessor implements NettyRequestProcessor {
             }
         }
         OperationResult result = new OperationResult();
+        //todo  注意这里只针对提交 回滚结果进行处理 对于unkonwn结果并没有做处理
+        //  事实上也是这样 针对unkown结果这里endteasaction不做处理 会有个线程 定时检测
         //1、如果收到的是提交事务消息
         if (MessageSysFlag.TRANSACTION_COMMIT_TYPE == requestHeader.getCommitOrRollback()) {
             //2、从commitLog中查出原始的prepared消息
@@ -118,16 +120,19 @@ public class EndTransactionProcessor implements NettyRequestProcessor {
                 //3、检查获取到的消息是否和当前消息匹配（包括ProduceGroup、queueOffset、commitLogOffset）
                 RemotingCommand res = checkPrepareMessage(result.getPrepareMessage(), requestHeader);
                 if (res.getCode() == ResponseCode.SUCCESS) {
+
                     //4、使用原始的prepared消息属性，构建最终发给consumer的消息
                     MessageExtBrokerInner msgInner = endMessageTransaction(result.getPrepareMessage());
                     msgInner.setSysFlag(MessageSysFlag.resetTransactionValue(msgInner.getSysFlag(), requestHeader.getCommitOrRollback()));
                     msgInner.setQueueOffset(requestHeader.getTranStateTableOffset());
                     msgInner.setPreparedTransactionOffset(requestHeader.getCommitLogOffset());
                     msgInner.setStoreTimestamp(result.getPrepareMessage().getStoreTimestamp());
+
                     //5、调用MessageStore的消息存储接口提交消息，使用真正的topic和queueId
                     RemotingCommand sendResult = sendFinalMessage(msgInner);
                     if (sendResult.getCode() == ResponseCode.SUCCESS) {
                         //6、设置Prepared消息的标记位为delete
+                        //删除prepared消息 其实现方法并不是真正的删除 将消息存储到另外一个队列
                         this.brokerController.getTransactionalMessageService().deletePrepareMessage(result.getPrepareMessage());
                     }
                     return sendResult;
@@ -185,6 +190,11 @@ public class EndTransactionProcessor implements NettyRequestProcessor {
         return response;
     }
 
+    /**
+     * 恢复消息的主题消费队列构建新的消息对象
+     * @param msgExt
+     * @return
+     */
     private MessageExtBrokerInner endMessageTransaction(MessageExt msgExt) {
         MessageExtBrokerInner msgInner = new MessageExtBrokerInner();
         msgInner.setTopic(msgExt.getUserProperty(MessageConst.PROPERTY_REAL_TOPIC));
@@ -210,6 +220,11 @@ public class EndTransactionProcessor implements NettyRequestProcessor {
         return msgInner;
     }
 
+    /**
+     * 将事务消息再次存储到commitlog文件里面
+     * @param msgInner
+     * @return
+     */
     private RemotingCommand sendFinalMessage(MessageExtBrokerInner msgInner) {
         final RemotingCommand response = RemotingCommand.createResponseCommand(null);
         final PutMessageResult putMessageResult = this.brokerController.getMessageStore().putMessage(msgInner);

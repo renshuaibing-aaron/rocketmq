@@ -22,6 +22,7 @@ public class PullRequestHoldService extends ServiceThread {
     private final BrokerController brokerController;
     private final SystemClock systemClock = new SystemClock();
 
+    //这些都是被暂时挂起的请求
     private ConcurrentMap<String/* topic@queueId */, ManyPullRequest> pullRequestTable =
         new ConcurrentHashMap<String, ManyPullRequest>(1024);
 

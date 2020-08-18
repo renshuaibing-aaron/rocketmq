@@ -178,10 +178,14 @@ public class TransactionalMessageBridge {
     }
 
     /**
+     * todo
      * 在将消息存到MessageStore之前，会将原始的Topic和queueId放入自定义属性中，
      * 然后将sysFlag设置成非事务消息，topic统一改成RMQ_SYS_TRANS_HALF_TOPIC,queueId设置为0。
      * 这样所有的Prepared消息都会发到同一个topic的同一个queue下面。而且因为这个topic是系统内置的，
      * consumer不会订阅这个topic的消息，所以Prepared的消息是不会被Consumer收到的
+     *  也就是说事务消息在未提交之前并不会存入原有的消息主题 自然不会被消费
+     *   既然变更了主题 rocketMq通常会采用定时任务(单独的线程)消费这个主题  然后将消息在满足特定的情况下恢复主题消息
+     *   进而被消费
      *
      * @param msgInner
      * @return

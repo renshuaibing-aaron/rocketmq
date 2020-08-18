@@ -41,12 +41,18 @@ public abstract class ReferenceResource {
     }
 
     public void shutdown(final long intervalForcibly) {
+        //关闭Mappedfile
         if (this.available) {
             this.available = false;
+            //设置初次关闭的时间戳
             this.firstShutdownTimestamp = System.currentTimeMillis();
+            //释放资源  只有release在引用次数小于1的时候才会释放资源
             this.release();
+
         } else if (this.getRefCount() > 0) {
+            //如果引用次数大于0 对比当前时间和初次设置时间 如果超过了最大拒绝时间
             if ((System.currentTimeMillis() - this.firstShutdownTimestamp) >= intervalForcibly) {
+                //每执行一次 将引用减少1000
                 this.refCount.set(-1000 - this.getRefCount());
                 this.release();
             }
@@ -54,10 +60,12 @@ public abstract class ReferenceResource {
     }
 
     public void release() {
+        //将引用次数减1
         long value = this.refCount.decrementAndGet();
-        if (value > 0)
+        if (value > 0) {
             return;
-
+        }
+         //如果引用小于0 直接执行cleanup方法
         synchronized (this) {
 
             this.cleanupOver = this.cleanup(value);

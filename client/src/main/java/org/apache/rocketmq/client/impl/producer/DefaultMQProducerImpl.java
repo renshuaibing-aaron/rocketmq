@@ -1280,6 +1280,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         // 发送【Half消息】  设置消息的事务属性,为PREPARED消息
         SendResult sendResult = null;
         MessageAccessor.putProperty(msg, MessageConst.PROPERTY_TRANSACTION_PREPARED, "true");
+        //设置消息生产者组 原因 在进行查询事务消息本地事务状态时 从该生产这组选择一个消息生产者即可
         MessageAccessor.putProperty(msg, MessageConst.PROPERTY_PRODUCER_GROUP, this.defaultMQProducer.getProducerGroup());
 
         try {
@@ -1300,6 +1301,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                     }
 
                     //6、使用客户端生成的唯一id作为事务ID
+                    //这个事务ID的作用
                     String transactionId = msg.getProperty(MessageConst.PROPERTY_UNIQ_CLIENT_MESSAGE_ID_KEYIDX);
                     if (null != transactionId && !"".equals(transactionId)) {
                         msg.setTransactionId(transactionId);
