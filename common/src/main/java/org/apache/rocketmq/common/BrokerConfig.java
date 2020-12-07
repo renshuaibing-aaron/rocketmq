@@ -117,6 +117,7 @@ public class BrokerConfig {
     private long consumerFallbehindThreshold = 1024L * 1024 * 1024 * 16;
 
     private boolean brokerFastFailureEnable = true;
+    //默认是200毫秒
     private long waitTimeMillsInSendQueue = 200;
     private long waitTimeMillsInPullQueue = 5 * 1000;
     private long waitTimeMillsInHeartbeatQueue = 31 * 1000;
@@ -749,7 +750,7 @@ public class BrokerConfig {
     public void setMsgTraceTopicName(String msgTraceTopicName) {
         this.msgTraceTopicName = msgTraceTopicName;
     }
-    
+
     public boolean isTraceTopicEnable() {
         return traceTopicEnable;
     }

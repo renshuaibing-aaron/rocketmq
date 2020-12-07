@@ -106,6 +106,7 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
      * </li>
      * </ul>
      */
+    //消费开始的地方策略 注意 这个只有在根据消费进度从消息服务器拉取不到消息时重新计算消费策略
     private ConsumeFromWhere consumeFromWhere = ConsumeFromWhere.CONSUME_FROM_LAST_OFFSET;
 
     /**
@@ -205,7 +206,7 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
 
     /**
      * Message pull Interval
-     * 推模式下拉取任务间隔 默认拉取任务之后继续拉取
+     * 推模式下拉取任务间隔 默认拉取任务之后继续拉取  这里是0 说明拉取之后会进行拉取 不停顿
      */
     private long pullInterval = 0;
 

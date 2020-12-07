@@ -108,6 +108,7 @@ public class ScheduleMessageService extends ConfigManager {
                 offset = 0L;
             }
 
+            //这里需要弄清楚 针对不同的延时队列 后台是启动多少个线程进行处理？ 一个？N个？ 这里需要搞明白Timer的原理
             if (timeDelay != null) {
                 this.timer.schedule(new DeliverDelayedMessageTimerTask(level, offset), FIRST_DELAY_TIME);
             }
@@ -168,6 +169,7 @@ public class ScheduleMessageService extends ConfigManager {
         }
     }
 
+    @Override
     public String encode(final boolean prettyFormat) {
         DelayOffsetSerializeWrapper delayOffsetSerializeWrapper = new DelayOffsetSerializeWrapper();
         delayOffsetSerializeWrapper.setOffsetTable(this.offsetTable);

@@ -436,6 +436,17 @@ public class ConsumeQueue {
     // 消息size占用4个字节，tagcode占用8个字节。然后找最后一个MappedFile，对于新建的文件，
     // 会有一个预热的动作，写把所有CQUnit初始化成0值。最后将Unit写入到文件中
     //
+
+    /**
+     *1.首先将一条ConsumeQueue条目总共20个字节写入到ByteBuffer中
+     *2.计算期望插入ConsumeQueue的位置 本质是找到最后一个MappedFile
+     * 3.把刚才缓存ByteBuffer中的字节数组写入MappedFile中
+     * @param offset
+     * @param size
+     * @param tagsCode
+     * @param cqOffset
+     * @return
+     */
     private boolean putMessagePositionInfo(final long offset, final int size, final long tagsCode,
         final long cqOffset) {
         System.out.println("【写消费队列ConsumeQueue文件】");

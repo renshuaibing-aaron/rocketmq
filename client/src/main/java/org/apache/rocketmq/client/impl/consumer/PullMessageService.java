@@ -27,7 +27,7 @@ public class PullMessageService extends ServiceThread {
     private final LinkedBlockingQueue<PullRequest> pullRequestQueue = new LinkedBlockingQueue<PullRequest>();
 
     //MQClient对象
-    private final MQClientInstance mQClientFactory;
+    private final MQClientInstance mQClientInstance;
     /**
      * 定时器。用于延迟提交拉取请求  线程池
      */
@@ -39,8 +39,8 @@ public class PullMessageService extends ServiceThread {
             }
         });
 
-    public PullMessageService(MQClientInstance mQClientFactory) {
-        this.mQClientFactory = mQClientFactory;
+    public PullMessageService(MQClientInstance mQClientInstance) {
+        this.mQClientInstance = mQClientInstance;
     }
 
     /**
@@ -96,7 +96,7 @@ public class PullMessageService extends ServiceThread {
      */
     private void pullMessage(final PullRequest pullRequest) {
         //根据消费组名 从MQClientInstance 中获取MQConsumerInner
-        final MQConsumerInner consumer = this.mQClientFactory.selectConsumer(pullRequest.getConsumerGroup());
+        final MQConsumerInner consumer = this.mQClientInstance.selectConsumer(pullRequest.getConsumerGroup());
         if (consumer != null) {
             //强制转换为DefaultMQPushConsumerImpl
             //说明 PullMessageService这个线程只为DefaultMQPushConsumerImpl 服务

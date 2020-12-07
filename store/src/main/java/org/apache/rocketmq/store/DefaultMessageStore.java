@@ -668,7 +668,8 @@ public class DefaultMessageStore implements MessageStore {
 
                         /**todo 判断下次消息拉取时  是从主节点 还是从节点
                          *     这里说明 rocketMq的读写分离的控制不是一般意思
-                         * maxOffsetPy：代表当前主服务器消息存储文件最大偏移量，maxPhyOffsetPulling：此次拉取消息最大偏移量。
+                         * maxOffsetPy：代表当前主服务器消息存储文件最大偏移量，
+                         * maxPhyOffsetPulling：此次拉取消息最大偏移量。
                          * diff：对于PullMessageService线程来说，当前未被拉取到消息消费端的消息长度。
                          *
                          * TOTAL_PHYSICAL_MEMORY_SIZE：RocketMQ所在服务器总内存大小；
@@ -678,8 +679,7 @@ public class DefaultMessageStore implements MessageStore {
                          */
                         long diff = maxOffsetPy - maxPhyOffsetPulling;  // TODO: 2020/4/19 21
 
-                        long memory = (long) (StoreUtil.TOTAL_PHYSICAL_MEMORY_SIZE
-                            * (this.messageStoreConfig.getAccessMessageInMemoryMaxRatio() / 100.0));
+                        long memory = (long) (StoreUtil.TOTAL_PHYSICAL_MEMORY_SIZE * (this.messageStoreConfig.getAccessMessageInMemoryMaxRatio() / 100.0));
                         //设置建议下次拉取的broker的地址
                         getResult.setSuggestPullingFromSlave(diff > memory);
                     } finally {
@@ -1880,6 +1880,7 @@ public class DefaultMessageStore implements MessageStore {
      */
     class ReputMessageService extends ServiceThread {
 
+        //从commitlog开始拉取的初始偏移量
         private volatile long reputFromOffset = 0;
 
         public long getReputFromOffset() {
@@ -2005,6 +2006,7 @@ public class DefaultMessageStore implements MessageStore {
 
             while (!this.isStopped()) {
                 try {
+                    //这里可以看出 基本上是每1毫秒 执行一次doreput  可以说这个线程一直在转发 commitlog 中的内容到 consumequeue、index
                     Thread.sleep(1);
                     this.doReput();
                 } catch (Exception e) {

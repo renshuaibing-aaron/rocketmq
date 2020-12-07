@@ -43,6 +43,7 @@ public class TransactionProducer {
                     new Message("TopicTest1234", tags[i % tags.length], "KEY" + i,
                         ("Hello RocketMQ " + i).getBytes(RemotingHelper.DEFAULT_CHARSET));
                 //3、发送消息
+                //todo  此处有个疑问  假如消息发送失败怎么处理  其实这个地方 生产者可以重复发送
                 SendResult sendResult = producer.sendMessageInTransaction(msg, null);
                 System.out.printf("%s%n", sendResult);
 

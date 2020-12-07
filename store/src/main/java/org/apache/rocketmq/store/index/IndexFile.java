@@ -21,14 +21,27 @@ import org.apache.rocketmq.store.MappedFile;
  */
 public class IndexFile {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
+    //每个hash槽所占的字节数
     private static int hashSlotSize = 4;
+
+    // 每条indexFile条目占用字节数
     private static int indexSize = 20;
+    // 用来验证是否是一个有效的索引
     private static int invalidIndex = 0;
+
+    // index 文件中 hash 槽的总个数
     private final int hashSlotNum;
+
+    // indexFile中包含的条目数
     private final int indexNum;
+
+    // 对应的映射文件
     private final MappedFile mappedFile;
+    // 对应的文件通道
     private final FileChannel fileChannel;
+    // 对应 PageCache
     private final MappedByteBuffer mappedByteBuffer;
+    // IndexHeader,每一个indexfile的头部信息
     private final IndexHeader indexHeader;
 
     public IndexFile(final String fileName, final int hashSlotNum, final int indexNum,
@@ -89,8 +102,8 @@ public class IndexFile {
      *
      * 将消息的索引键和消息的偏移量映射关系写入到indexfile中
      * @param key  消息索引
-     * @param phyOffset  消息物理偏移量
-     * @param storeTimestamp  消息的存储时间
+     * @param phyOffset  消息物理偏移量 消息存在commitLog中的偏移量
+     * @param storeTimestamp  消息的存储时间  消息存在commitlog中的时间戳
      * @return
      */
     public boolean putKey(final String key, final long phyOffset, final long storeTimestamp) {
@@ -100,8 +113,10 @@ public class IndexFile {
         if (this.indexHeader.getIndexCount() < this.indexNum) {
             //根据key计算出key的hashcode
             int keyHash = indexKeyHashMethod(key);
-            //然后利用keyhash对hash槽数量取余定位到hashcode对应的hash槽下标
+
+            //然后利用keyhash对hash槽数量取余定位到hashcode对应的hash槽下标  hashSlotNum默认500万
             int slotPos = keyHash % this.hashSlotNum;
+
             //hashcode对应的hash槽的物理地址为IndexHeader头部（40字节）加上下标乘以每个hash槽的大小(4字节)
             int absSlotPos = IndexHeader.INDEX_HEADER_SIZE + slotPos * hashSlotSize;
 
@@ -139,13 +154,22 @@ public class IndexFile {
 
                  //依次将hashcode 消息物理偏移量 消息存储时间戳和索引文件时间戳 当前Hash槽的值存入mappedByteBuffer 中
                 //将当前Index中包含的条目数量存入Hash槽中  将覆盖原先的Hash槽的值
+                //填充 IndexFile 条目，4字节（hashcode）
+                // + 8字节（commitlog offset）
+                // + 4字节（commitlog存储时间与indexfile第一个条目的时间差，单位秒）
+                // + 4字节（同hashcode的上一个的位置，0表示没有上一个）
                 this.mappedByteBuffer.putInt(absIndexPos, keyHash);
                 this.mappedByteBuffer.putLong(absIndexPos + 4, phyOffset);
                 this.mappedByteBuffer.putInt(absIndexPos + 4 + 8, (int) timeDiff);
                 this.mappedByteBuffer.putInt(absIndexPos + 4 + 8 + 4, slotValue);
+
+
+                //将当前先添加的条目的位置，存入到 key hashcode 对应的 hash槽，
+                // 也就是该字段里面存放的是该 hashcode 最新的条目（如果产生hash冲突，不同的key，hashcode相同
                 this.mappedByteBuffer.putInt(absSlotPos, this.indexHeader.getIndexCount());
 
-                //更新文件索引头信息
+
+                //更新文件索引头信息  比如最小时间和最大时间
                 if (this.indexHeader.getIndexCount() <= 1) {
                     //如果当前文件只包含一个条目 更新setBeginPhyOffset  setBeginTimestamp
                     this.indexHeader.setBeginPhyOffset(phyOffset);
@@ -218,8 +242,10 @@ public class IndexFile {
         if (this.mappedFile.hold()) {
             //1、跟生成索引时一样，找到key的slot
             int keyHash = indexKeyHashMethod(key);
+
             //定位到hashcode对应的hash槽下标
             int slotPos = keyHash % this.hashSlotNum;
+
             //计算hahs槽的物理地址=indexHeader头部(40字节)+上下标乘以每个槽的大小(4字节)
             int absSlotPos = IndexHeader.INDEX_HEADER_SIZE + slotPos * hashSlotSize;
 

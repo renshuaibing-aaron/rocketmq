@@ -1,20 +1,3 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package org.apache.rocketmq.common.subscription;
 
 import org.apache.rocketmq.common.MixAll;
@@ -34,6 +17,9 @@ public class SubscriptionGroupConfig {
 
     private long brokerId = MixAll.MASTER_ID;
 
+    //看这个单词的意思 当消费比较慢的时候  从服务器的选择
+    //根据代码可以知道 每次拉取消息的时候会进行判断 主服务器的压力 如果压力比较大 在下下次拉取的时候 会进行从服务器拉取
+    //并且可以知道  无论多少从服务器 只会拉取一个
     private long whichBrokerWhenConsumeSlowly = 1;
 
     private boolean notifyConsumerIdsChangedEnable = true;

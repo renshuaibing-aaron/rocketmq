@@ -98,6 +98,7 @@ public class MappedFile extends ReferenceResource {
     //通过fileChannel.map得到的可读写的内存映射buffer，如果没有启用
     //TransientStorePool则写数据时会写到该缓冲中，刷盘时直接调用该
     //映射buffer的force函数，而不需要进行commit操作
+    //todo  这里注意理解零拷贝的应用 自己的理解
     private MappedByteBuffer mappedByteBuffer;
 
 

@@ -105,8 +105,11 @@ public class HAService {
         System.out.println("【HAservice 启动】");
         //主服务器启动 并在特定的端口上监听从服务器的连接
         this.acceptSocketService.beginAccept();
+
         this.acceptSocketService.start();
+
         this.groupTransferService.start();
+
         this.haClient.start();
     }
 
@@ -318,6 +321,7 @@ public class HAService {
             }
         }
 
+        @Override
         public void run() {
             log.info(this.getServiceName() + " service started");
 
@@ -383,6 +387,7 @@ public class HAService {
             }
         }
 
+        //判断是否需要向Master反馈当前的待拉取消息的偏移量
         private boolean isTimeToReportOffset() {
             long interval =
                 HAService.this.defaultMessageStore.getSystemClock().now() - this.lastWriteTimestamp;
@@ -410,6 +415,7 @@ public class HAService {
             this.reportOffset.limit(8);
 
 
+            //通过一个循环 判断byteBuffer是不是全部写入到通道里面
             for (int i = 0; i < 3 && this.reportOffset.hasRemaining(); i++) {
                 try {
                     this.socketChannel.write(this.reportOffset);
@@ -446,7 +452,7 @@ public class HAService {
             this.byteBufferBackup = tmp;
         }
 
-        //进行事件选择
+        //进行网络读请求处理 也就是处理从Master传回的消息数据
         private boolean processReadEvent() {
             int readSizeZeroTimes = 0;
             //循环判断 readByteBuffer 是否还有剩余空间，如果
@@ -457,7 +463,7 @@ public class HAService {
                     int readSize = this.socketChannel.read(this.byteBufferRead);
                     if (readSize > 0) {
 
-                        //如果读取到的字节数大于 0 ，重置i卖取到 0 字节的次数，并更新最后一次写入时间
+                        //如果读取到的字节数大于 0 ，重置i读取到 0 字节的次数，并更新最后一次写入时间
                         //戳 （lastWriteTimestamp ），然后调用 dispatchReadRequest 方法将读取到的所有消息全部追
                         //加到消息内存映射文件中，然后再次反馈拉取进度给服务器
                         lastWriteTimestamp = HAService.this.defaultMessageStore.getSystemClock().now();
@@ -486,7 +492,7 @@ public class HAService {
             return true;
         }
 
-        //处理网络读请求，即处理从 Master 服务器传田的消息数据
+        //从节点获取从Master传回的数据 调用此方法将读取到的消息全部追回到消息的内存映射文件中
         private boolean dispatchReadRequest() {
             final int msgHeaderSize = 8 + 4; // phyoffset + size
             int readSocketPos = this.byteBufferRead.position();
@@ -516,6 +522,7 @@ public class HAService {
                         this.byteBufferRead.position(readSocketPos);
                         this.dispatchPostion += msgHeaderSize + bodySize;
 
+                        //反馈拉取进度给主服务器
                         if (!reportSlaveMaxOffsetPlus()) {
                             return false;
                         }

@@ -91,7 +91,7 @@ public class DefaultMQConsumerWithTraceTest {
 
     private String topic = "FooBar";
     private String brokerName = "BrokerA";
-    private MQClientInstance mQClientFactory;
+    private MQClientInstance mQClientInstance;
 
     @Mock
     private MQClientAPIImpl mQClientAPIImpl;
@@ -103,7 +103,7 @@ public class DefaultMQConsumerWithTraceTest {
 
 
     private AsyncTraceDispatcher asyncTraceDispatcher;
-    private MQClientInstance mQClientTraceFactory;
+    private MQClientInstance mQClientTraceInstance;
     @Mock
     private MQClientAPIImpl mQClientTraceAPIImpl;
     private DefaultMQProducer traceProducer;
@@ -139,34 +139,34 @@ public class DefaultMQConsumerWithTraceTest {
         pushConsumer.subscribe(topic, "*");
         pushConsumer.start();
 
-        mQClientFactory = spy(pushConsumerImpl.getmQClientFactory());
-        mQClientTraceFactory = spy(pushConsumerImpl.getmQClientFactory());
+        mQClientInstance = spy(pushConsumerImpl.getmQClientInstance());
+        mQClientTraceInstance = spy(pushConsumerImpl.getmQClientInstance());
 
         field = DefaultMQPushConsumerImpl.class.getDeclaredField("mQClientFactory");
         field.setAccessible(true);
-        field.set(pushConsumerImpl, mQClientFactory);
+        field.set(pushConsumerImpl, mQClientInstance);
 
         field = MQClientInstance.class.getDeclaredField("mQClientAPIImpl");
         field.setAccessible(true);
-        field.set(mQClientFactory, mQClientAPIImpl);
+        field.set(mQClientInstance, mQClientAPIImpl);
 
         Field fieldTrace = DefaultMQProducerImpl.class.getDeclaredField("mQClientFactory");
         fieldTrace.setAccessible(true);
-        fieldTrace.set(traceProducer.getDefaultMQProducerImpl(), mQClientTraceFactory);
+        fieldTrace.set(traceProducer.getDefaultMQProducerImpl(), mQClientTraceInstance);
 
         fieldTrace = MQClientInstance.class.getDeclaredField("mQClientAPIImpl");
         fieldTrace.setAccessible(true);
-        fieldTrace.set(mQClientTraceFactory, mQClientTraceAPIImpl);
+        fieldTrace.set(mQClientTraceInstance, mQClientTraceAPIImpl);
 
-        pullAPIWrapper = spy(new PullAPIWrapper(mQClientFactory, consumerGroup, false));
+        pullAPIWrapper = spy(new PullAPIWrapper(mQClientInstance, consumerGroup, false));
         field = DefaultMQPushConsumerImpl.class.getDeclaredField("pullAPIWrapper");
         field.setAccessible(true);
         field.set(pushConsumerImpl, pullAPIWrapper);
 
-        pushConsumer.getDefaultMQPushConsumerImpl().getRebalanceImpl().setmQClientFactory(mQClientFactory);
-        mQClientFactory.registerConsumer(consumerGroup, pushConsumerImpl);
+        pushConsumer.getDefaultMQPushConsumerImpl().getRebalanceImpl().setmQClientInstance(mQClientInstance);
+        mQClientInstance.registerConsumer(consumerGroup, pushConsumerImpl);
 
-        when(mQClientFactory.getMQClientAPIImpl().pullMessage(anyString(), any(PullMessageRequestHeader.class),
+        when(mQClientInstance.getMQClientAPIImpl().pullMessage(anyString(), any(PullMessageRequestHeader.class),
             anyLong(), any(CommunicationMode.class), nullable(PullCallback.class)))
             .thenAnswer(new Answer<Object>() {
                 @Override
@@ -186,7 +186,7 @@ public class DefaultMQConsumerWithTraceTest {
                 }
             });
 
-        doReturn(new FindBrokerResult("127.0.0.1:10911", false)).when(mQClientFactory).findBrokerAddressInSubscribe(anyString(), anyLong(), anyBoolean());
+        doReturn(new FindBrokerResult("127.0.0.1:10911", false)).when(mQClientInstance).findBrokerAddressInSubscribe(anyString(), anyLong(), anyBoolean());
         Set<MessageQueue> messageQueueSet = new HashSet<MessageQueue>();
         messageQueueSet.add(createPullRequest().getMessageQueue());
         pushConsumer.getDefaultMQPushConsumerImpl().updateTopicSubscribeInfo(topic, messageQueueSet);
@@ -216,7 +216,7 @@ public class DefaultMQConsumerWithTraceTest {
             }
         }));
 
-        PullMessageService pullMessageService = mQClientFactory.getPullMessageService();
+        PullMessageService pullMessageService = mQClientInstance.getPullMessageService();
         pullMessageService.executePullRequestImmediately(createPullRequest());
         countDownLatch.await(3000L, TimeUnit.MILLISECONDS);
         assertThat(messageExts[0].getTopic()).isEqualTo(topic);

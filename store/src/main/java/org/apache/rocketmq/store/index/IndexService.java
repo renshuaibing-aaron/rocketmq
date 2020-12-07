@@ -24,8 +24,13 @@ public class IndexService {
      */
     private static final int MAX_TRY_IDX_CREATE = 3;
     private final DefaultMessageStore defaultMessageStore;
+
+    //hash槽数量，默认5百万个
     private final int hashSlotNum;
+    //index条目个数，默认为 2千万个
     private final int indexNum;
+
+    //index存储路径，默认为：/rocket_home/store/index
     private final String storePath;
     private final ArrayList<IndexFile> indexFileList = new ArrayList<IndexFile>();
     private final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();

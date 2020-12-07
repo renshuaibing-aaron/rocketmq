@@ -588,7 +588,7 @@ public class DefaultMQPullConsumerImpl implements MQConsumerInner {
                 this.rebalanceImpl.setConsumerGroup(this.defaultMQPullConsumer.getConsumerGroup());
                 this.rebalanceImpl.setMessageModel(this.defaultMQPullConsumer.getMessageModel());
                 this.rebalanceImpl.setAllocateMessageQueueStrategy(this.defaultMQPullConsumer.getAllocateMessageQueueStrategy());
-                this.rebalanceImpl.setmQClientFactory(this.mQClientFactory);
+                this.rebalanceImpl.setmQClientInstance(this.mQClientFactory);
 
                 //构建 PullAPIWrapper 对象，该对象封装了具体拉取消息的逻辑，PULL,PUSH 模式最终都会调用 PullAPIWrapper 类的方法从 Broker 拉取消息
                 this.pullAPIWrapper = new PullAPIWrapper(
